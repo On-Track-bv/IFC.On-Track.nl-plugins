@@ -1,0 +1,132 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ifc.on-track.nl/schemas/bridge-data.schema.json",
+  "title": "BridgeData",
+  "description": "Complete data package exchanged between host application and IFC.On-Track.nl UI",
+  "type": "object",
+  "properties": {
+    "ifcData": {
+      "type": "array",
+      "description": "List of IFC entities from the host application",
+      "items": { "$ref": "#/$defs/IfcEntity" }
+    },
+    "settings": {
+      "$ref": "#/$defs/BridgeSettings",
+      "description": "UI and application settings"
+    },
+    "propertyIsInstanceMap": {
+      "type": ["object", "null"],
+      "description": "Map of property name to whether it is an instance parameter",
+      "additionalProperties": { "type": "boolean" }
+    }
+  },
+  "required": ["ifcData"],
+
+  "$defs": {
+    "IfcEntity": {
+      "type": "object",
+      "description": "IFC entity representation",
+      "properties": {
+        "type":          { "type": ["string", "null"] },
+        "name":          { "type": ["string", "null"] },
+        "description":   { "type": ["string", "null"] },
+        "objectType":    { "type": ["string", "null"] },
+        "tag":           { "type": ["string", "null"] },
+        "predefinedType":{ "type": ["string", "null"] },
+        "isDefinedBy": {
+          "type": ["array", "null"],
+          "items": { "$ref": "#/$defs/IfcPropertySet" }
+        },
+        "hasAssociations": {
+          "type": ["array", "null"],
+          "items": { "$ref": "#/$defs/IfcClassificationReference" }
+        }
+      }
+    },
+
+    "IfcPropertySet": {
+      "type": "object",
+      "description": "IFC PropertySet",
+      "properties": {
+        "type":  { "type": "string", "default": "IfcPropertySet" },
+        "name":  { "type": ["string", "null"] },
+        "hasProperties": {
+          "type": ["array", "null"],
+          "items": { "$ref": "#/$defs/IfcProperty" }
+        }
+      },
+      "required": ["type"]
+    },
+
+    "IfcProperty": {
+      "type": "object",
+      "description": "IFC single-value property",
+      "properties": {
+        "type":         { "type": "string", "default": "IfcPropertySingleValue" },
+        "name":         { "type": ["string", "null"] },
+        "nominalValue": {}
+      },
+      "required": ["type"]
+    },
+
+    "IfcClassificationReference": {
+      "type": "object",
+      "description": "IFC classification reference, used for bSDD linking",
+      "properties": {
+        "type":           { "type": "string", "default": "IfcClassificationReference" },
+        "location":       { "type": ["string", "null"] },
+        "identification": { "type": ["string", "null"] },
+        "name":           { "type": ["string", "null"] },
+        "referencedSource": { "$ref": "#/$defs/IfcClassification" }
+      },
+      "required": ["type"]
+    },
+
+    "IfcClassification": {
+      "type": "object",
+      "description": "IFC Classification (bSDD dictionary)",
+      "properties": {
+        "type":     { "type": "string", "default": "IfcClassification" },
+        "location": { "type": ["string", "null"] },
+        "name":     { "type": ["string", "null"] }
+      },
+      "required": ["type"]
+    },
+
+    "BridgeSettings": {
+      "type": "object",
+      "description": "UI and application settings",
+      "properties": {
+        "bsddApiEnvironment": {
+          "type": "string",
+          "enum": ["production", "test"],
+          "default": "production"
+        },
+        "mainDictionary":    { "$ref": "#/$defs/BsddDictionary" },
+        "ifcDictionary":     { "$ref": "#/$defs/BsddDictionary" },
+        "filterDictionaries": {
+          "type": ["array", "null"],
+          "items": { "$ref": "#/$defs/BsddDictionary" }
+        },
+        "language": {
+          "type": "string",
+          "description": "IETF language tag, e.g. nl-NL",
+          "default": "nl-NL"
+        },
+        "includeTestDictionaries": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+
+    "BsddDictionary": {
+      "type": "object",
+      "description": "Reference to a bSDD dictionary",
+      "properties": {
+        "ifcClassification":  { "$ref": "#/$defs/IfcClassification" },
+        "parameterMapping":   { "type": ["string", "null"] }
+      }
+    }
+  }
+}

@@ -1,0 +1,61 @@
+<!-- Purpose: Revit plugin project for IFC.On-Track.nl -->
+<!-- Using Nice3point.Revit.Sdk for simplified multi-version support -->
+<Project Sdk="Nice3point.Revit.Sdk/6.1.0">
+
+    <PropertyGroup>
+        <RootNamespace>IfcOnTrack.Revit</RootNamespace>
+        <AssemblyName>IfcOnTrack.Revit</AssemblyName>
+        <UseWPF>true</UseWPF>
+        <DeployAddin>true</DeployAddin>
+        <LaunchRevit>true</LaunchRevit>
+        <EnableDynamicLoading>true</EnableDynamicLoading>
+        <Configurations>Debug.R24;Debug.R25;Debug.R26</Configurations>
+        <Configurations>$(Configurations);Release.R24;Release.R25;Release.R26</Configurations>
+    </PropertyGroup>
+
+    <!-- ILRepack for merging assemblies (requires ILRepack package to be installed) -->
+    <PropertyGroup>
+        <IsRepackable>false</IsRepackable>
+    </PropertyGroup>
+
+    <!-- Revit Platform packages (version auto-resolved by SDK) -->
+    <ItemGroup>
+        <PackageReference Include="Nice3point.Revit.Toolkit" Version="$(RevitVersion).*" />
+        <PackageReference Include="Nice3point.Revit.Extensions" Version="$(RevitVersion).*" />
+        <PackageReference Include="Nice3point.Revit.Api.RevitAPI" Version="$(RevitVersion).*" />
+        <PackageReference Include="Nice3point.Revit.Api.RevitAPIUI" Version="$(RevitVersion).*" />
+    </ItemGroup>
+
+    <!-- MVVM -->
+    <ItemGroup>
+        <PackageReference Include="CommunityToolkit.Mvvm" Version="8.*" />
+    </ItemGroup>
+
+    <!-- IOC / Hosting -->
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.*" />
+    </ItemGroup>
+
+    <!-- Build tools -->
+    <ItemGroup>
+        <PackageReference Include="ILRepack" Version="2.*" />
+    </ItemGroup>
+
+    <!-- Core reference -->
+    <ItemGroup>
+        <ProjectReference Include="..\IfcOnTrack.Core\IfcOnTrack.Core.csproj" />
+    </ItemGroup>
+
+    <!-- Embedded resources -->
+    <ItemGroup>
+        <Resource Include="Resources\Icons\RibbonIcon16.png" />
+        <Resource Include="Resources\Icons\RibbonIcon32.png" />
+        <Resource Include="Resources\Icons\BsddIcon16.png" />
+        <Resource Include="Resources\Icons\BsddIcon32.png" />
+        <Resource Include="Resources\Icons\IdsIcon16.png" />
+        <Resource Include="Resources\Icons\IdsIcon32.png" />
+        <Resource Include="Resources\Icons\SettingsIcon16.png" />
+        <Resource Include="Resources\Icons\SettingsIcon32.png" />
+    </ItemGroup>
+
+</Project>

@@ -1,0 +1,30 @@
+<!-- Purpose: Shared MSBuild properties for all projects in the solution -->
+<!-- Note: Most properties are handled by Nice3point.Revit.Sdk -->
+<Project>
+    <!-- Version and metadata -->
+    <PropertyGroup>
+        <Version>1.0.0</Version>
+        <Authors>On-Track B.V.</Authors>
+        <Company>On-Track B.V.</Company>
+        <Product>IFC.On-Track.nl Plugins</Product>
+        <Copyright>Copyright © On-Track B.V. 2024-2026</Copyright>
+        <PackageProjectUrl>https://github.com/on-track-nl/IFC.On-Track.nl-plugins</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/on-track-nl/IFC.On-Track.nl-plugins</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+    </PropertyGroup>
+
+    <!-- Code quality -->
+    <PropertyGroup>
+        <LangVersion>latest</LangVersion>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>true</ImplicitUsings>
+        <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    </PropertyGroup>
+
+    <!-- Output paths (SDK handles per-version output) -->
+    <PropertyGroup>
+        <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+        <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+        <PlatformTarget>x64</PlatformTarget>
+    </PropertyGroup>
+</Project>

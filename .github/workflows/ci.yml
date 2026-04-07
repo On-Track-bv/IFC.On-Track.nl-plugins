@@ -1,0 +1,106 @@
+# Purpose: Build and test workflow for IFC.On-Track.nl plugins
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  # ─── .NET (Revit / Tekla) ────────────────────────────────────────────────────
+  dotnet:
+    name: dotnet (${{ matrix.configuration }})
+    runs-on: windows-latest
+
+    strategy:
+      matrix:
+        configuration: ['Release.R24', 'Release.R25', 'Release.R26']
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore -p:Configuration="${{ matrix.configuration }}"
+
+      - name: Build
+        run: dotnet build -c "${{ matrix.configuration }}" --no-restore
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugins-${{ matrix.configuration }}
+          path: output/
+          if-no-files-found: warn
+
+  # ─── TypeScript ──────────────────────────────────────────────────────────────
+  typescript:
+    name: typescript
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: source/typescript
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: source/typescript/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+  # ─── Release (main only) ─────────────────────────────────────────────────────
+  release:
+    needs: [dotnet, typescript]
+    runs-on: windows-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Install NUKE
+        run: dotnet tool install Nuke.GlobalTool --global
+
+      - name: Build with NUKE
+        run: nuke Compile
+        env:
+          BUILD_VERSION: ${{ github.run_number }}
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      # TODO: Add installer creation step
+      # TODO: Add GitHub release creation step

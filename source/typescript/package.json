@@ -1,0 +1,17 @@
+{
+  "name": "@ifc-on-track/plugins",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "generate-types": "json-schema-to-typescript ../../contracts/bridge-data.schema.json --out packages/core/src/generated"
+  },
+  "devDependencies": {
+    "json-schema-to-typescript": "^15.0.0",
+    "typescript": "^5.8.0"
+  }
+}
