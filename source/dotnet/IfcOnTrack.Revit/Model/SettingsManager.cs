@@ -84,15 +84,12 @@ public class SettingsManager
     }
 
     /// <summary>
-    /// Save settings to document storage.
+    /// Save settings to document storage. Call this INSIDE an active transaction.
     /// </summary>
     public void SaveSettings(Document doc, BridgeSettings settings)
     {
         try
         {
-            using var transaction = new Transaction(doc, "Save bSDD Settings");
-            transaction.Start();
-
             var schema = GetOrCreateSettingsSchema();
             var dataStorage = GetOrCreateSettingsStorage(doc, schema);
 
@@ -100,8 +97,6 @@ public class SettingsManager
             var json = JsonConvert.SerializeObject(settings);
             entity.Set("SettingsJson", json);
             dataStorage.SetEntity(entity);
-
-            transaction.Commit();
 
             _cachedSettings = settings;
             _logger.LogInformation("Saved settings to document");

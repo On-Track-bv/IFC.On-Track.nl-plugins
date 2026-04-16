@@ -1,6 +1,6 @@
 <!-- Purpose: Revit plugin project for IFC.On-Track.nl -->
 <!-- Using Nice3point.Revit.Sdk for simplified multi-version support -->
-<Project Sdk="Nice3point.Revit.Sdk/6.1.0">
+<Project Sdk="Nice3point.Revit.Sdk/6.2.0">
 
     <PropertyGroup>
         <RootNamespace>IfcOnTrack.Revit</RootNamespace>
@@ -13,17 +13,30 @@
         <Configurations>$(Configurations);Release.R24;Release.R25;Release.R26</Configurations>
     </PropertyGroup>
 
-    <!-- ILRepack for merging assemblies (requires ILRepack package to be installed) -->
+    <!-- ILRepack: bundle dependencies into a single assembly for deployment -->
+    <!-- Disabled for R24/net48 because CefSharp ships native DLLs that ILRepack cannot process. -->
+    <!-- R24 ships individual managed DLLs; CefSharp is provided by Revit itself at runtime.     -->
     <PropertyGroup>
-        <IsRepackable>false</IsRepackable>
+        <IsRepackable>true</IsRepackable>
+        <IsRepackable Condition="'$(RevitVersion)' == '2024'">false</IsRepackable>
     </PropertyGroup>
 
-    <!-- Revit Platform packages (version auto-resolved by SDK) -->
+    <!-- Revit API packages (version auto-resolved by SDK per build configuration) -->
     <ItemGroup>
-        <PackageReference Include="Nice3point.Revit.Toolkit" Version="$(RevitVersion).*" />
-        <PackageReference Include="Nice3point.Revit.Extensions" Version="$(RevitVersion).*" />
-        <PackageReference Include="Nice3point.Revit.Api.RevitAPI" Version="$(RevitVersion).*" />
-        <PackageReference Include="Nice3point.Revit.Api.RevitAPIUI" Version="$(RevitVersion).*" />
+        <PackageReference Include="Nice3point.Revit.Toolkit" Version="$(RevitVersion).*-*" />
+        <PackageReference Include="Nice3point.Revit.Extensions" Version="$(RevitVersion).*-*" />
+        <PackageReference Include="Nice3point.Revit.Api.RevitAPI" Version="$(RevitVersion).*-*" />
+        <PackageReference Include="Nice3point.Revit.Api.RevitAPIUI" Version="$(RevitVersion).*-*" />
+    </ItemGroup>
+
+    <!-- Browser control: CefSharp for .NET 4.8 (Revit 2024), WebView2 for .NET 8 (Revit 2025+) -->
+    <!-- NOTE: CefSharp ships with Revit 2024 – don't deploy it, just reference for compilation.  -->
+    <!--       ExcludeAssets="runtime;native" prevents CefSharp DLLs from being copied to bin.   -->
+    <ItemGroup Condition="'$(RevitVersion)' == '2024'">
+        <PackageReference Include="CefSharp.Wpf" Version="128.*" ExcludeAssets="runtime;native" />
+    </ItemGroup>
+    <ItemGroup Condition="'$(RevitVersion)' != '2024'">
+        <PackageReference Include="Microsoft.Web.WebView2" Version="1.*" />
     </ItemGroup>
 
     <!-- MVVM -->
@@ -36,9 +49,23 @@
         <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.*" />
     </ItemGroup>
 
+    <!-- JSON -->
+    <ItemGroup>
+        <PackageReference Include="Newtonsoft.Json" Version="13.*" />
+    </ItemGroup>
+
+    <!-- Logging -->
+    <ItemGroup>
+        <PackageReference Include="Serilog" Version="4.*" />
+        <PackageReference Include="Serilog.Extensions.Hosting" Version="8.*" />
+        <PackageReference Include="Serilog.Sinks.Debug" Version="3.*" />
+        <PackageReference Include="Serilog.Sinks.File" Version="6.*" />
+    </ItemGroup>
+
     <!-- Build tools -->
     <ItemGroup>
-        <PackageReference Include="ILRepack" Version="2.*" />
+        <PackageReference Include="ILRepack" Version="2.0.44" />
+        <PackageReference Include="JetBrains.Annotations" Version="2025.*" PrivateAssets="all" />
     </ItemGroup>
 
     <!-- Core reference -->
@@ -54,6 +81,8 @@
         <Resource Include="Resources\Icons\BsddIcon32.png" />
         <Resource Include="Resources\Icons\IdsIcon16.png" />
         <Resource Include="Resources\Icons\IdsIcon32.png" />
+        <Resource Include="Resources\Icons\IfcExportIcon16.png" />
+        <Resource Include="Resources\Icons\IfcExportIcon32.png" />
         <Resource Include="Resources\Icons\SettingsIcon16.png" />
         <Resource Include="Resources\Icons\SettingsIcon32.png" />
     </ItemGroup>

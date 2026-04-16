@@ -21,15 +21,17 @@ public class BsddSearchBridge
     private readonly SettingsManager _settingsManager;
     
     // Nice3point async event handlers
+#pragma warning disable CS0618 // AsyncEventHandler is obsolete; migrate to AsyncExternalEvent when API stabilises
     private readonly AsyncEventHandler _eventHandler = new();
     private readonly AsyncEventHandler<string> _eventHandlerWithResult = new();
+#pragma warning restore CS0618
     
     // Initial data passed to search window
     private BridgeData? _bridgeData;
     
     // Callbacks for window management
     private Action? _closeWindowCallback;
-    private Action? _refreshSelectionCallback;
+    private Action<List<IfcEntity>>? _refreshSelectionCallback;
     
     public BsddSearchBridge(
         ILogger<BsddSearchBridge> logger,
@@ -59,14 +61,17 @@ public class BsddSearchBridge
     
     /// <summary>
     /// Sets callback for refreshing selection panel after save.
+    /// Receives the freshly-read entity list so the panel can push it via window.updateSelection.
     /// </summary>
-    public void SetRefreshCallback(Action callback)
+    public void SetRefreshCallback(Action<List<IfcEntity>> callback)
     {
         _refreshSelectionCallback = callback;
     }
 
     /// <summary>
     /// Called from JavaScript to save bSDD data to Revit elements.
+    /// After saving, reads back all element types and passes them to the refresh callback
+    /// so the selection panel can push an updated window.updateSelection([...]).
     /// </summary>
     /// <param name="ifcJsonData">JSON of BridgeData with updated IFC entities</param>
     /// <returns>JSON result</returns>
@@ -76,38 +81,41 @@ public class BsddSearchBridge
         
         try
         {
-            var bridgeData = JsonConvert.DeserializeObject<BridgeData>(ifcJsonData);
+            var bridgeData = JsonConvert.DeserializeObject<BridgeData>(ifcJsonData ?? string.Empty);
             if (bridgeData == null)
-            {
                 return JsonConvert.SerializeObject(new { success = false, error = "Invalid data" });
-            }
-            
-            await _eventHandler.RaiseAsync(app =>
+
+            List<IfcEntity>? refreshedEntities = null;
+
+            await _eventHandlerWithResult.RaiseAsync(app =>
             {
                 var doc = app.ActiveUIDocument?.Document;
-                if (doc == null) return;
-                
-                using var transaction = new Transaction(doc, "Apply bSDD Classifications");
-                transaction.Start();
-                
-                // Apply data to elements
+                if (doc == null) return string.Empty;
+
+                // ApplyBridgeData opens its own sub-transactions internally
                 _elementsManager.ApplyBridgeData(doc, bridgeData);
-                
-                // Also save settings if present
+
+                // Persist settings if present
                 if (bridgeData.Settings != null)
                 {
+                    using var settingsTx = new Transaction(doc, "Save bSDD Settings");
+                    settingsTx.Start();
                     _settingsManager.SaveSettings(doc, bridgeData.Settings);
+                    settingsTx.Commit();
                 }
-                
-                transaction.Commit();
+
+                // Read back all elements to refresh the selection panel
+                refreshedEntities = _elementsManager.GetAllElementTypesAsIfcJson(doc);
+                return string.Empty;
             });
-            
-            // Refresh selection panel
-            _refreshSelectionCallback?.Invoke();
-            
-            // Close window
+
+            // Push refreshed entities to selection panel (C# → JS via window.updateSelection)
+            if (refreshedEntities != null)
+                _refreshSelectionCallback?.Invoke(refreshedEntities);
+
+            // Close search window
             _closeWindowCallback?.Invoke();
-            
+
             return JsonConvert.SerializeObject(new { success = true });
         }
         catch (Exception ex)
@@ -140,6 +148,17 @@ public class BsddSearchBridge
         }
         
         return JsonConvert.SerializeObject(new BridgeData());
+    }
+
+    /// <summary>
+    /// Called from JavaScript to load settings only.
+    /// Required by BsddBridgeInterface.ts contract alongside loadBridgeData.
+    /// </summary>
+    public string loadSettings()
+    {
+        _logger.LogInformation("loadSettings called");
+        var settings = _bridgeData?.Settings ?? new BridgeSettings();
+        return JsonConvert.SerializeObject(settings);
     }
 
     /// <summary>

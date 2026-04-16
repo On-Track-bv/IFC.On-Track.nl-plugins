@@ -13,6 +13,17 @@ namespace IfcOnTrack.Revit.Bridge;
 /// JavaScript bridge for the bSDD Selection dockable pane.
 /// Exposes methods callable from the embedded browser UI.
 /// Uses Nice3point's AsyncEventHandler for thread-safe Revit API access.
+///
+/// C# → JS push functions (set as window.xxx by useCefSharpBridge.ts):
+///   window.updateSelection(entities)  — update the full element list
+///   window.updateSettings(settings)   — update settings
+/// JS → C# pull functions (called by useCefSharpBridge.ts on init):
+///   bsddBridge.loadBridgeData()       — returns {settings, ifcData:[], propertyIsInstanceMap}
+///   bsddBridge.loadSettings()         — returns settings JSON
+/// JS → C# event functions:
+///   bsddBridge.bsddSearch(entities)   — open search window
+///   bsddBridge.bsddSelect(entities)   — select in Revit
+///   bsddBridge.saveSettings(settings) — persist settings
 /// </summary>
 public class BsddSelectionBridge
 {
@@ -21,11 +32,19 @@ public class BsddSelectionBridge
     private readonly SettingsManager _settingsManager;
     
     // Nice3point async event handlers for Revit API calls
+#pragma warning disable CS0618 // AsyncEventHandler is obsolete; migrate to AsyncExternalEvent when API stabilises
     private readonly AsyncEventHandler _eventHandler = new();
     private readonly AsyncEventHandler<string> _eventHandlerWithResult = new();
+#pragma warning restore CS0618
     
-    // Callback to open search window
-    private Action<List<IfcEntity>>? _openSearchCallback;
+    /// <summary>Callback invoked (on UI thread) to open search window. Receives full BridgeData with entities + settings + propertyIsInstanceMap.</summary>
+    private Action<BridgeData>? _openSearchCallback;
+    
+    /// <summary>Callback invoked (on UI thread) with refreshed entities after a search-window save.</summary>
+    private Action<List<IfcEntity>>? _refreshCallback;
+
+    /// <summary>Callback invoked (on UI thread) with new settings after saveSettings.</summary>
+    private Action<BridgeSettings>? _pushSettingsCallback;
     
     public BsddSelectionBridge(
         ILogger<BsddSelectionBridge> logger,
@@ -38,36 +57,73 @@ public class BsddSelectionBridge
     }
     
     /// <summary>
-    /// Sets callback for opening search window with selected elements.
+    /// Sets callback for opening search window. The callback receives a full BridgeData
+    /// (entities + settings + propertyIsInstanceMap).
     /// </summary>
-    public void SetSearchCallback(Action<List<IfcEntity>> callback)
+    public void SetSearchCallback(Action<BridgeData> callback)
     {
         _openSearchCallback = callback;
     }
 
     /// <summary>
+    /// Sets callback (called on UI thread) with refreshed entities after a search-window save.
+    /// </summary>
+    public void SetRefreshCallback(Action<List<IfcEntity>> callback)
+    {
+        _refreshCallback = callback;
+    }
+
+    /// <summary>
+    /// Sets callback (called on UI thread) with updated settings after saveSettings.
+    /// </summary>
+    public void SetPushSettingsCallback(Action<BridgeSettings> callback)
+    {
+        _pushSettingsCallback = callback;
+    }
+
+    /// <summary>
+    /// Called by the search window after a successful save. Pushes fresh entities to the panel.
+    /// </summary>
+    public void TriggerRefresh(List<IfcEntity> entities)
+    {
+        _refreshCallback?.Invoke(entities);
+    }
+
+    /// <summary>
     /// Called from JavaScript to open bSDD Search panel with selected elements.
+    /// Builds the full BridgeData (entities + settings + propertyIsInstanceMap) that the search
+    /// window needs, then invokes the open-search callback on the UI thread.
     /// </summary>
     /// <param name="ifcJsonData">JSON array of IfcEntity objects</param>
-    /// <returns>JSON result</returns>
-    public async Task<string> bsddSearch(string ifcJsonData)
+    public async Task bsddSearch(string ifcJsonData)
     {
         _logger.LogInformation("bsddSearch called with {Length} chars", ifcJsonData?.Length ?? 0);
         
         try
         {
-            var entities = JsonConvert.DeserializeObject<List<IfcEntity>>(ifcJsonData ?? "[]") 
+            var entities = JsonConvert.DeserializeObject<List<IfcEntity>>(ifcJsonData ?? "[]")
                 ?? new List<IfcEntity>();
-            
-            // Open the search window with the selected entities
-            _openSearchCallback?.Invoke(entities);
-            
-            return JsonConvert.SerializeObject(new { success = true });
+
+            // Build full BridgeData in the Revit API context so we get settings + propertyIsInstanceMap
+            var bridgeDataJson = await _eventHandlerWithResult.RaiseAsync(app =>
+            {
+                var doc = app.ActiveUIDocument?.Document;
+                var settings = doc != null ? _settingsManager.LoadSettings(doc) : new BridgeSettings();
+                var propMap = doc != null ? _elementsManager.GetProjectParameterTypes(doc) : new Dictionary<string, bool>();
+                return JsonConvert.SerializeObject(new BridgeData
+                {
+                    Settings = settings,
+                    IfcData = entities,
+                    PropertyIsInstanceMap = propMap
+                });
+            });
+            var bridgeData = JsonConvert.DeserializeObject<BridgeData>(bridgeDataJson) ?? new BridgeData { IfcData = entities };
+
+            _openSearchCallback?.Invoke(bridgeData);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "bsddSearch failed");
-            return JsonConvert.SerializeObject(new { success = false, error = ex.Message });
         }
     }
 
@@ -97,6 +153,7 @@ public class BsddSelectionBridge
 
     /// <summary>
     /// Called from JavaScript to save settings to the document.
+    /// After save, pushes the new settings back to the browser panel via window.updateSettings.
     /// </summary>
     /// <param name="settingsJson">JSON of BridgeSettings</param>
     public async Task saveSettings(string settingsJson)
@@ -118,6 +175,9 @@ public class BsddSelectionBridge
                 _settingsManager.SaveSettings(doc, settings);
                 transaction.Commit();
             });
+
+            // Push updated settings to the browser panel (C# → JS push)
+            _pushSettingsCallback?.Invoke(settings);
         }
         catch (Exception ex)
         {
@@ -126,9 +186,10 @@ public class BsddSelectionBridge
     }
 
     /// <summary>
-    /// Called from JavaScript to load current bridge data (settings + empty IFC data).
+    /// Called from JavaScript (useCefSharpBridge) on panel init to load the initial bridge data.
+    /// Returns {settings, ifcData: [], propertyIsInstanceMap} — the selection panel starts empty;
+    /// the full element list is pushed separately via window.updateSelection([...]).
     /// </summary>
-    /// <returns>JSON of BsddBridgeData</returns>
     public async Task<string> loadBridgeData()
     {
         _logger.LogInformation("loadBridgeData called");
@@ -139,18 +200,17 @@ public class BsddSelectionBridge
             {
                 var doc = app.ActiveUIDocument?.Document;
                 if (doc == null)
-                {
                     return JsonConvert.SerializeObject(new BridgeData());
-                }
                 
                 var settings = _settingsManager.LoadSettings(doc);
-                var bridgeData = new BridgeData
+                var propMap = _elementsManager.GetProjectParameterTypes(doc);
+
+                return JsonConvert.SerializeObject(new BridgeData
                 {
                     Settings = settings,
-                    IfcData = new List<IfcEntity>() // Selection panel starts with empty data
-                };
-                
-                return JsonConvert.SerializeObject(bridgeData);
+                    IfcData = new List<IfcEntity>(), // full list pushed via updateSelection
+                    PropertyIsInstanceMap = propMap
+                });
             });
         }
         catch (Exception ex)
@@ -161,78 +221,26 @@ public class BsddSelectionBridge
     }
 
     /// <summary>
-    /// Called from JavaScript to load all element types in the document.
+    /// Called from JavaScript to load settings only (without element data).
+    /// Required by BsddBridgeInterface.ts contract alongside loadBridgeData.
     /// </summary>
-    /// <returns>JSON of BridgeData with all element types</returns>
-    public async Task<string> loadAllElements()
+    public async Task<string> loadSettings()
     {
-        _logger.LogInformation("loadAllElements called");
-        
-        try
-        {
-            return await _eventHandlerWithResult.RaiseAsync(app =>
-            {
-                var doc = app.ActiveUIDocument?.Document;
-                if (doc == null)
-                {
-                    return JsonConvert.SerializeObject(new BridgeData());
-                }
-                
-                var settings = _settingsManager.LoadSettings(doc);
-                var entities = _elementsManager.GetAllElementTypesAsIfcJson(doc);
-                
-                var bridgeData = new BridgeData
-                {
-                    Settings = settings,
-                    IfcData = entities
-                };
-                
-                return JsonConvert.SerializeObject(bridgeData);
-            });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "loadAllElements failed");
-            return JsonConvert.SerializeObject(new BridgeData());
-        }
-    }
+        _logger.LogInformation("loadSettings called");
 
-    /// <summary>
-    /// Called from JavaScript to load elements in current view.
-    /// </summary>
-    /// <returns>JSON of BridgeData with view elements</returns>
-    public async Task<string> loadViewElements()
-    {
-        _logger.LogInformation("loadViewElements called");
-        
         try
         {
             return await _eventHandlerWithResult.RaiseAsync(app =>
             {
                 var doc = app.ActiveUIDocument?.Document;
-                var view = app.ActiveUIDocument?.ActiveView;
-                
-                if (doc == null || view == null)
-                {
-                    return JsonConvert.SerializeObject(new BridgeData());
-                }
-                
-                var settings = _settingsManager.LoadSettings(doc);
-                var entities = _elementsManager.GetViewElementTypesAsIfcJson(doc, view);
-                
-                var bridgeData = new BridgeData
-                {
-                    Settings = settings,
-                    IfcData = entities
-                };
-                
-                return JsonConvert.SerializeObject(bridgeData);
+                var settings = doc != null ? _settingsManager.LoadSettings(doc) : new BridgeSettings();
+                return JsonConvert.SerializeObject(settings);
             });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "loadViewElements failed");
-            return JsonConvert.SerializeObject(new BridgeData());
+            _logger.LogError(ex, "loadSettings failed");
+            return JsonConvert.SerializeObject(new BridgeSettings());
         }
     }
 }
