@@ -23,6 +23,13 @@
     <!-- Common packages -->
     <ItemGroup>
         <PackageReference Include="Newtonsoft.Json" Version="13.*" />
+    </ItemGroup>
+    <!-- net48 (R24): Hosting 8.x breaks on net48 due to IAsyncDisposable; use 6.x. -->
+    <ItemGroup Condition="'$(RevitVersion)' == '2024'">
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="7.*" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="7.*" />
+    </ItemGroup>
+    <ItemGroup Condition="'$(RevitVersion)' != '2024'">
         <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.*" />
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.*" />
     </ItemGroup>

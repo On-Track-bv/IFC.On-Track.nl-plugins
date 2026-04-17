@@ -45,7 +45,12 @@
     </ItemGroup>
 
     <!-- IOC / Hosting -->
-    <ItemGroup>
+    <!-- net48 (R24): Microsoft.Extensions.Hosting 8.x uses IAsyncDisposable in a way that breaks on net48;
+         use 6.x which targets netstandard2.0 cleanly. R25/R26 keep 8.x. -->
+    <ItemGroup Condition="'$(RevitVersion)' == '2024'">
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="7.*" />
+    </ItemGroup>
+    <ItemGroup Condition="'$(RevitVersion)' != '2024'">
         <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.*" />
     </ItemGroup>
 
@@ -57,7 +62,9 @@
     <!-- Logging -->
     <ItemGroup>
         <PackageReference Include="Serilog" Version="4.*" />
-        <PackageReference Include="Serilog.Extensions.Hosting" Version="8.*" />
+        <!-- Serilog.Extensions.Hosting 7.x targets Hosting 6.x (net48); 8.x targets Hosting 8.x (net8) -->
+        <PackageReference Include="Serilog.Extensions.Hosting" Version="8.*" Condition="'$(RevitVersion)' != '2024'" />
+        <PackageReference Include="Serilog.Extensions.Hosting" Version="7.*" Condition="'$(RevitVersion)' == '2024'" />
         <PackageReference Include="Serilog.Sinks.Debug" Version="3.*" />
         <PackageReference Include="Serilog.Sinks.File" Version="6.*" />
     </ItemGroup>

@@ -7,6 +7,8 @@ using Nice3point.Revit.Extensions.UI;
 using Nice3point.Revit.Toolkit.Decorators;
 using Nice3point.Revit.Toolkit.External;
 using Nice3point.Revit.Toolkit.Options;
+using Autodesk.Revit.UI;
+using IfcOnTrack.Core.Bridge;
 using IfcOnTrack.Revit.Commands;
 using IfcOnTrack.Revit.Model;
 using IfcOnTrack.Revit.UI;
@@ -35,6 +37,16 @@ public class Application : ExternalApplication
         Host.Start();
         SubscribeToDocumentEvents();
         CreateRibbon();
+
+        // ExternalEvent.Create must be called in IExternalApplication context.
+        // Must be done BEFORE RegisterDockablePane: if the panel was visible in the
+        // previous Revit session, Revit will eagerly call FrameworkElementCreator
+        // during registration, instantiating BsddSelectionView while Event is still null.
+        var handler = Host.GetService<SelectionEventHandler>();
+        var manager = Host.GetService<SelectionEventManager>();
+        manager.Handler = handler;
+        manager.Event = Autodesk.Revit.UI.ExternalEvent.Create(handler);
+
         RegisterDockablePane();
     }
 
@@ -76,9 +88,9 @@ public class Application : ExternalApplication
 
     private void OnDocumentClosing(object? sender, DocumentClosingEventArgs e)
     {
-        // Clear any cached data for the closing document
-        var settingsManager = Host.TryGetService<SettingsManager>();
-        settingsManager?.ClearCache();
+        // Remove cached selection for the closing document
+        if (!string.IsNullOrEmpty(e.Document.PathName))
+            Host.TryGetService<LastSelectionCache>()?.Remove(e.Document.PathName);
     }
 
     private void OnViewActivated(object? sender, ViewActivatedEventArgs e)
@@ -103,21 +115,16 @@ public class Application : ExternalApplication
 
             var settings = settingsManager.LoadSettings(doc);
 
-            // Push settings to the dockable panel browser (C# → JS: window.updateSettings)
             var view = Host.TryGetService<BsddSelectionView>();
-            if (view != null)
-            {
-                view.Dispatcher.InvokeAsync(() => view.PushSettingsToJs(settings));
+            if (view == null) return;
 
-                // Also push all element types so the panel shows current data
-                // (C# → JS: window.updateSelection)
-                var elementsManager = Host.TryGetService<ElementsManager>();
-                if (elementsManager != null)
-                {
-                    var entities = elementsManager.GetAllElementTypesAsIfcJson(doc);
-                    view.Dispatcher.InvokeAsync(() => view.PushSelectionToJs(entities));
-                }
-            }
+            // Push settings (C# → JS: window.updateSettings)
+            view.Dispatcher.InvokeAsync(() => view.PushSettingsToJs(settings));
+
+            // Restore last selection for this document, or empty list if none yet
+            var cache = Host.TryGetService<LastSelectionCache>();
+            var entities = cache?.Get(doc.PathName) ?? new List<IfcEntity>();
+            view.Dispatcher.InvokeAsync(() => view.PushSelectionToJs(entities));
         }
         catch (Exception ex)
         {
@@ -132,45 +139,31 @@ public class Application : ExternalApplication
     {
         var panel = Application.CreatePanel("bSDD", "IFC.On-Track.nl");
 
-        // bSDD Panel toggle (dockable pane)
-        panel.AddPushButton<ShowBsddPanelCommand>("bSDD\nPanel")
+        // Toggle dockable pane (matches original "bSDD selection" button)
+        panel.AddPushButton<ShowBsddPanelCommand>("bSDD\nselection")
             .SetImage("/IfcOnTrack.Revit;component/Resources/Icons/BsddIcon16.png")
             .SetLargeImage("/IfcOnTrack.Revit;component/Resources/Icons/BsddIcon32.png")
             .SetToolTip("Show/hide bSDD Classification panel");
 
-        // bSDD Search command (modal window with selected elements)
-        panel.AddPushButton<BsddCommand>("bSDD\nSearch")
-            .SetImage("/IfcOnTrack.Revit;component/Resources/Icons/BsddIcon16.png")
-            .SetLargeImage("/IfcOnTrack.Revit;component/Resources/Icons/BsddIcon32.png")
-            .SetToolTip("Open bSDD search and link classifications to selected elements");
-
-        panel.AddSeparator();
-
-        // IFC Export with bSDD
-        panel.AddPushButton<IfcExportCommand>("IFC\nExport")
+        // IFC Export with bSDD (matches original "IFC export" button)
+        panel.AddPushButton<IfcExportCommand>("IFC\nexport")
             .SetImage("/IfcOnTrack.Revit;component/Resources/Icons/IfcExportIcon16.png")
             .SetLargeImage("/IfcOnTrack.Revit;component/Resources/Icons/IfcExportIcon32.png")
             .SetToolTip("Export to IFC with correct bSDD classification references");
-
-        panel.AddSeparator();
-
-        // IDS Validator
-        panel.AddPushButton<IdsCommand>("IDS\nValidate")
-            .SetImage("/IfcOnTrack.Revit;component/Resources/Icons/IdsIcon16.png")
-            .SetLargeImage("/IfcOnTrack.Revit;component/Resources/Icons/IdsIcon32.png")
-            .SetToolTip("Validate model against IDS requirements");
-
-        // Settings
-        panel.AddPushButton<SettingsCommand>("Settings")
-            .SetImage("/IfcOnTrack.Revit;component/Resources/Icons/SettingsIcon16.png")
-            .SetLargeImage("/IfcOnTrack.Revit;component/Resources/Icons/SettingsIcon32.png")
-            .SetToolTip("Configure IFC.On-Track.nl settings");
     }
 
     // ─── Dockable pane ─────────────────────────────────────────────────────────
 
+    // Static: persists for the Revit session AppDomain lifetime.
+    // GetDockablePane() throws when the pane isn't registered yet, so it cannot
+    // be used as a guard. A static flag is the only safe double-registration check.
+    private static bool _dockablePaneRegistered;
+
     private void RegisterDockablePane()
     {
+        if (_dockablePaneRegistered)
+            return;
+
         DockablePaneProvider
             .Register(Application, BsddSelectionPaneId, "bSDD Classification")
             .SetConfiguration(data =>
@@ -184,6 +177,7 @@ public class Application : ExternalApplication
                     DockPosition = DockPosition.Right
                 };
             });
+        _dockablePaneRegistered = true;
     }
 }
 

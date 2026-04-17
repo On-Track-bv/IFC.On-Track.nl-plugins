@@ -34,7 +34,7 @@ public class SettingsManager
     }
 
     /// <summary>
-    /// Load settings from document storage.
+    /// Load settings from document storage. Always reads fresh from DataStorage.
     /// </summary>
     public BridgeSettings LoadSettings(Document doc)
     {
@@ -44,8 +44,7 @@ public class SettingsManager
             if (schema == null)
             {
                 _logger.LogDebug("Settings schema not found, using defaults");
-                _cachedSettings = GetDefaultSettings();
-                return _cachedSettings;
+                return GetDefaultSettings();
             }
 
             // Find DataStorage element with our settings
@@ -53,33 +52,24 @@ public class SettingsManager
             if (dataStorage == null)
             {
                 _logger.LogDebug("Settings storage not found, using defaults");
-                _cachedSettings = GetDefaultSettings();
-                return _cachedSettings;
+                return GetDefaultSettings();
             }
 
             var entity = dataStorage.GetEntity(schema);
             if (!entity.IsValid())
-            {
-                _cachedSettings = GetDefaultSettings();
-                return _cachedSettings;
-            }
+                return GetDefaultSettings();
 
             var json = entity.Get<string>("SettingsJson");
             if (string.IsNullOrEmpty(json))
-            {
-                _cachedSettings = GetDefaultSettings();
-                return _cachedSettings;
-            }
+                return GetDefaultSettings();
 
-            _cachedSettings = JsonConvert.DeserializeObject<BridgeSettings>(json) ?? GetDefaultSettings();
             _logger.LogInformation("Loaded settings from document");
-            return _cachedSettings;
+            return JsonConvert.DeserializeObject<BridgeSettings>(json) ?? GetDefaultSettings();
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to load settings");
-            _cachedSettings = GetDefaultSettings();
-            return _cachedSettings;
+            return GetDefaultSettings();
         }
     }
 
