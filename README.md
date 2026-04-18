@@ -8,7 +8,7 @@ These plugins embed the [IFC.On-Track.nl](https://ifc.on-track.nl) platform into
 
 | Application | Status | Revit Versions |
 |-------------|--------|----------------|
-| Autodesk Revit | ✅ Active | 2024, 2025, 2026 |
+| Autodesk Revit | ✅ Active | 2025, 2026 |
 | Tekla Structures | 🚧 Planned | - |
 | Trimble Connect | 🔗 Web-based | N/A |
 
@@ -42,8 +42,7 @@ These plugins embed the [IFC.On-Track.nl](https://ifc.on-track.nl) platform into
 ### Prerequisites
 
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
-- [.NET Framework 4.8](https://dotnet.microsoft.com/download/dotnet-framework/net48) (for Revit 2024)
-- Autodesk Revit 2024, 2025, or 2026
+- Autodesk Revit 2025 or 2026
 - [NUKE](https://nuke.build/) (optional, for full build)
 
 ### Build & Debug

@@ -6,30 +6,18 @@
         <RootNamespace>IfcOnTrack.Core</RootNamespace>
         <AssemblyName>IfcOnTrack.Core</AssemblyName>
         <UseWPF>true</UseWPF>
-        <Configurations>Debug.R24;Debug.R25;Debug.R26</Configurations>
-        <Configurations>$(Configurations);Release.R24;Release.R25;Release.R26</Configurations>
+        <Configurations>Debug.R25;Debug.R26</Configurations>
+        <Configurations>$(Configurations);Release.R25;Release.R26</Configurations>
     </PropertyGroup>
 
-    <!-- CefSharp for .NET Framework (Revit 2024) -->
-    <ItemGroup Condition="'$(RevitVersion)' == '2024'">
-        <PackageReference Include="CefSharp.Wpf" Version="128.*" />
-    </ItemGroup>
-
-    <!-- WebView2 for .NET 8 targets (Revit 2025+) -->
-    <ItemGroup Condition="'$(RevitVersion)' != '2024'">
+    <!-- WebView2 for .NET 8 (Revit 2025+) -->
+    <ItemGroup>
         <PackageReference Include="Microsoft.Web.WebView2" Version="1.*" />
     </ItemGroup>
 
     <!-- Common packages -->
     <ItemGroup>
         <PackageReference Include="Newtonsoft.Json" Version="13.*" />
-    </ItemGroup>
-    <!-- net48 (R24): Hosting 8.x breaks on net48 due to IAsyncDisposable; use 6.x. -->
-    <ItemGroup Condition="'$(RevitVersion)' == '2024'">
-        <PackageReference Include="Microsoft.Extensions.Hosting" Version="7.*" />
-        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="7.*" />
-    </ItemGroup>
-    <ItemGroup Condition="'$(RevitVersion)' != '2024'">
         <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.*" />
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.*" />
     </ItemGroup>

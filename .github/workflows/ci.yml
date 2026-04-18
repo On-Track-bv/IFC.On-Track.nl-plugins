@@ -19,7 +19,7 @@ jobs:
 
     strategy:
       matrix:
-        configuration: ['Release.R24', 'Release.R25', 'Release.R26']
+        configuration: ['Release.R25', 'Release.R26']
 
     steps:
       - name: Checkout

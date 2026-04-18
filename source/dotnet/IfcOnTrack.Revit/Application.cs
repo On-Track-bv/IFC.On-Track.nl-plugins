@@ -7,7 +7,6 @@ using Nice3point.Revit.Extensions.UI;
 using Nice3point.Revit.Toolkit.Decorators;
 using Nice3point.Revit.Toolkit.External;
 using Nice3point.Revit.Toolkit.Options;
-using Autodesk.Revit.UI;
 using IfcOnTrack.Core.Bridge;
 using IfcOnTrack.Revit.Commands;
 using IfcOnTrack.Revit.Model;
@@ -30,7 +29,7 @@ public class Application : ExternalApplication
     /// <summary>
     /// GUID for the bSDD Selection dockable pane.
     /// </summary>
-    public static readonly Guid BsddSelectionPaneId = new("D7C963CE-B3CA-426A-8D51-6E8254D21158");
+    public static readonly Guid BsddSelectionPaneId = new("E8F5A3D7-9C1B-4E2A-8F7D-5C6B4A3E2D1F");
 
     public override void OnStartup()
     {
