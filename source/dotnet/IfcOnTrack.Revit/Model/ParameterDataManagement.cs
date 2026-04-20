@@ -160,10 +160,19 @@ public class ParameterDataManagement
                     ? iv
                     : propertyIsInstanceMap.TryGetValue(psetPropKey, out var iv2) && iv2;
 
-                var bsddParamName = CreateParameterNameFromPropertySet(pset.Name, prop);
-                parametersToCreate.Add(new ParameterCreation(
-                    bsddParamName, effectiveSpecType,
-                    _parametersManager.ExistingProjectParameter(doc, bsddParamName), isInstance));
+                // Use simple property name for built-in Revit parameters (e.g. "Manufacturer", "LoadBearing")
+                // These already exist and should not be duplicated as project parameters
+                var bsddParamName = IsBuiltInParameter(propKey) 
+                    ? propKey 
+                    : CreateParameterNameFromPropertySet(pset.Name, prop);
+
+                // Only create new parameter if it's NOT a built-in Revit parameter
+                if (!IsBuiltInParameter(propKey))
+                {
+                    parametersToCreate.Add(new ParameterCreation(
+                        bsddParamName, effectiveSpecType,
+                        _parametersManager.ExistingProjectParameter(doc, bsddParamName), isInstance));
+                }
 
                 if (!isInstance)
                     parametersToSet[bsddParamName] = value;
@@ -275,15 +284,34 @@ public class ParameterDataManagement
     {
         if (val.Value == null) return null;
 
-        return val.Type switch
+        // Handle empty or whitespace-only strings
+        var stringValue = val.Value.ToString();
+        if (string.IsNullOrWhiteSpace(stringValue)) return null;
+
+        try
         {
-            "IfcBoolean" => Convert.ToBoolean(val.Value) ? 1 : 0,
-            "IfcInteger" => System.Convert.ToInt32(val.Value),
-            "IfcReal" => ConvertMmToFeet(System.Convert.ToDouble(val.Value,
-                System.Globalization.CultureInfo.InvariantCulture)),
-            "IfcDate" or "IfcDateTime" => System.Convert.ToDateTime(val.Value).ToString(),
-            _ => val.Value.ToString()
-        };
+            return val.Type switch
+            {
+                "IfcBoolean" => Convert.ToBoolean(val.Value) ? 1 : 0,
+                "IfcInteger" => System.Convert.ToInt32(val.Value),
+                "IfcReal" => ConvertMmToFeet(System.Convert.ToDouble(val.Value,
+                    System.Globalization.CultureInfo.InvariantCulture)),
+                "IfcDate" or "IfcDateTime" => System.Convert.ToDateTime(val.Value).ToString(),
+                _ => stringValue
+            };
+        }
+        catch (FormatException ex)
+        {
+            _logger.LogWarning(ex, "Failed to convert value '{Value}' to type '{Type}', using null", 
+                stringValue, val.Type);
+            return null;
+        }
+        catch (InvalidCastException ex)
+        {
+            _logger.LogWarning(ex, "Failed to cast value '{Value}' to type '{Type}', using null", 
+                stringValue, val.Type);
+            return null;
+        }
     }
 
     private static ForgeTypeId GetSpecTypeFromIfcValue(IfcValue val)
@@ -352,5 +380,29 @@ public class ParameterDataManagement
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Checks if a parameter name corresponds to a built-in Revit parameter.
+    /// Built-in parameters should not be duplicated as project parameters.
+    /// </summary>
+    private static bool IsBuiltInParameter(string parameterName)
+    {
+        // Common IFC/bSDD properties that map to built-in Revit parameters
+        // These should use the native Revit parameter instead of creating duplicates
+        return parameterName switch
+        {
+            "Manufacturer" => true,
+            "LoadBearing" => true,
+            "IsExternal" => true,
+            "FireRating" => true,
+            "ThermalTransmittance" => true,
+            "Reference" => true,
+            "Status" => true,
+            "AcousticRating" => true,
+            "SurfaceSpreadOfFlame" => true,
+            "Combustible" => true,
+            _ => false
+        };
     }
 }

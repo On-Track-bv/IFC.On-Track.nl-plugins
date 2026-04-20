@@ -30,30 +30,33 @@ public class BsddSelectionBridge
     private readonly ILogger<BsddSelectionBridge> _logger;
     private readonly ElementsManager _elementsManager;
     private readonly SettingsManager _settingsManager;
-    
+    private readonly LastSelectionCache _lastSelectionCache;
+
     // Nice3point async event handlers for Revit API calls
 #pragma warning disable CS0618 // AsyncEventHandler is obsolete; migrate to AsyncExternalEvent when API stabilises
     private readonly AsyncEventHandler _eventHandler = new();
     private readonly AsyncEventHandler<string> _eventHandlerWithResult = new();
 #pragma warning restore CS0618
-    
+
     /// <summary>Callback invoked (on UI thread) to open search window. Receives full BridgeData with entities + settings + propertyIsInstanceMap.</summary>
     private Action<BridgeData>? _openSearchCallback;
-    
+
     /// <summary>Callback invoked (on UI thread) with refreshed entities after a search-window save.</summary>
     private Action<List<IfcEntity>>? _refreshCallback;
 
     /// <summary>Callback invoked (on UI thread) with new settings after saveSettings.</summary>
     private Action<BridgeSettings>? _pushSettingsCallback;
-    
+
     public BsddSelectionBridge(
         ILogger<BsddSelectionBridge> logger,
         ElementsManager elementsManager,
-        SettingsManager settingsManager)
+        SettingsManager settingsManager,
+        LastSelectionCache lastSelectionCache)
     {
         _logger = logger;
         _elementsManager = elementsManager;
         _settingsManager = settingsManager;
+        _lastSelectionCache = lastSelectionCache;
     }
     
     /// <summary>
@@ -91,33 +94,37 @@ public class BsddSelectionBridge
 
     /// <summary>
     /// Called from JavaScript to open bSDD Search panel with selected elements.
-    /// Builds the full BridgeData (entities + settings + propertyIsInstanceMap) that the search
-    /// window needs, then invokes the open-search callback on the UI thread.
+    /// The UI sends the user-selected entities to edit, but we preserve the FULL
+    /// original selection from LastSelectionCache so after save we can restore
+    /// the complete list (e.g., user selected 10, picks 2 to edit, we keep all 10).
     /// </summary>
-    /// <param name="ifcJsonData">JSON array of IfcEntity objects</param>
+    /// <param name="ifcJsonData">JSON array of IfcEntity objects selected in UI for editing</param>
     public async Task bsddSearch(string ifcJsonData)
     {
         _logger.LogInformation("bsddSearch called with {Length} chars", ifcJsonData?.Length ?? 0);
-        
+
         try
         {
-            var entities = JsonConvert.DeserializeObject<List<IfcEntity>>(ifcJsonData ?? "[]")
+            var entitiesToEdit = JsonConvert.DeserializeObject<List<IfcEntity>>(ifcJsonData ?? "[]")
                 ?? new List<IfcEntity>();
 
-            // Build full BridgeData in the Revit API context so we get settings + propertyIsInstanceMap
+            // Build full BridgeData in the Revit API context
             var bridgeDataJson = await _eventHandlerWithResult.RaiseAsync(app =>
             {
                 var doc = app.ActiveUIDocument?.Document;
                 var settings = doc != null ? _settingsManager.LoadSettings(doc) : new BridgeSettings();
                 var propMap = doc != null ? _elementsManager.GetProjectParameterTypes(doc) : new Dictionary<string, bool>();
+
+                // Send the entities selected for editing to the search window
                 return JsonConvert.SerializeObject(new BridgeData
                 {
                     Settings = settings,
-                    IfcData = entities,
+                    IfcData = entitiesToEdit,
                     PropertyIsInstanceMap = propMap
                 });
             });
-            var bridgeData = JsonConvert.DeserializeObject<BridgeData>(bridgeDataJson) ?? new BridgeData { IfcData = entities };
+            var bridgeData = JsonConvert.DeserializeObject<BridgeData>(bridgeDataJson) 
+                ?? new BridgeData { IfcData = entitiesToEdit };
 
             _openSearchCallback?.Invoke(bridgeData);
         }

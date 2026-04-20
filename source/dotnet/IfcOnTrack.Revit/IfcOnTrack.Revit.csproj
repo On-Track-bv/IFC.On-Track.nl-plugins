@@ -79,4 +79,11 @@
         <Resource Include="Resources\Icons\SettingsIcon32.png" />
     </ItemGroup>
 
+    <!-- Copy BsddSettings.json to output directory -->
+    <ItemGroup>
+        <None Include="UI\Settings\BsddSettings.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+
 </Project>

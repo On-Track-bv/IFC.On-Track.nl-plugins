@@ -17,8 +17,7 @@ namespace IfcOnTrack.Revit.Model;
 ///   - Classifications and properties are additionally stored as Revit project parameters
 ///     so they can be exported via IFC.
 ///
-/// The schema UUID 79717CB2-D47B-4EC0-8E74-83A43E7D9F0A is shared with the original
-/// bSDD-Revit-plugin for data interoperability.
+/// Uses a unique schema GUID to avoid conflicts with the legacy bSDD-Revit-plugin.
 /// </summary>
 public class ElementsManager
 {
@@ -27,8 +26,9 @@ public class ElementsManager
     private readonly ParameterDataManagement _paramDataManagement;
     private readonly ParametersManager _parametersManager;
 
-    // Schema GUID matches bSDD-Revit-plugin for data interoperability
-    private static readonly Guid SchemaGuid = new("79717CB2-D47B-4EC0-8E74-83A43E7D9F0A");
+    // Schema GUID for IFC associations storage (unique for IFC.On-Track.nl plugin)
+    // Different from old bSDD-Revit-plugin to avoid conflicts
+    private static readonly Guid SchemaGuid = new("B7C4D8A2-5E3F-4A1B-9D6C-2F8E7A4B3C1D");
     private const string SchemaFieldName = "IfcClassificationData";
 
     public ElementsManager(
@@ -343,7 +343,7 @@ public class ElementsManager
         if (schema != null) return schema;
 
         var builder = new SchemaBuilder(SchemaGuid);
-        builder.SetSchemaName("BsddData");
+        builder.SetSchemaName("IfcOnTrackAssociations_v2");
         builder.SetReadAccessLevel(AccessLevel.Public);
         builder.SetWriteAccessLevel(AccessLevel.Public);
         builder.AddSimpleField(SchemaFieldName, typeof(string));

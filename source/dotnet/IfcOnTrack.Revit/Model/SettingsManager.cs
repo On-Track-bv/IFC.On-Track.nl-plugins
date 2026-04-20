@@ -1,8 +1,11 @@
 // Purpose: Manages bSDD settings storage in Revit document
+using System.IO;
+using System.Reflection;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.ExtensibleStorage;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using Serilog;
 using IfcOnTrack.Core.Bridge;
 
 namespace IfcOnTrack.Revit.Model;
@@ -14,8 +17,9 @@ public class SettingsManager
 {
     private readonly ILogger<SettingsManager> _logger;
     
-    // Schema GUID for settings storage
-    private static readonly Guid SettingsSchemaGuid = new("F7D6DC5C-9521-49E4-B6D8-6F50252E9D73");
+    // Schema GUID for settings storage (unique for IFC.On-Track.nl plugin)
+    // Different from old bSDD-Revit-plugin to avoid conflicts
+    private static readonly Guid SettingsSchemaGuid = new("A3F8E2D1-4B9C-4E7A-8F2D-1C5B9A7E3D6F");
     
     // Cached settings
     private BridgeSettings? _cachedSettings;
@@ -64,7 +68,10 @@ public class SettingsManager
                 return GetDefaultSettings();
 
             _logger.LogInformation("Loaded settings from document");
-            return JsonConvert.DeserializeObject<BridgeSettings>(json) ?? GetDefaultSettings();
+            var loaded = JsonConvert.DeserializeObject<BridgeSettings>(json) ?? GetDefaultSettings();
+            // Ensure FilterDictionaries is never null — JS calls .map() on it
+            loaded.FilterDictionaries ??= new List<BsddDictionary>();
+            return loaded;
         }
         catch (Exception ex)
         {
@@ -129,7 +136,7 @@ public class SettingsManager
         if (existing != null) return existing;
 
         var dataStorage = DataStorage.Create(doc);
-        dataStorage.Name = "IfcOnTrack_BsddSettings";
+        dataStorage.Name = "IfcOnTrack_Settings_v2";
         return dataStorage;
     }
 
@@ -139,7 +146,7 @@ public class SettingsManager
         if (schema != null) return schema;
 
         var builder = new SchemaBuilder(SettingsSchemaGuid);
-        builder.SetSchemaName("IfcOnTrackSettings");
+        builder.SetSchemaName("IfcOnTrackSettings_v2");
         builder.SetReadAccessLevel(AccessLevel.Public);
         builder.SetWriteAccessLevel(AccessLevel.Public);
         builder.SetVendorId("IFC.On-Track.nl");
@@ -150,11 +157,93 @@ public class SettingsManager
 
     private static BridgeSettings GetDefaultSettings()
     {
+        try
+        {
+            // Load default settings from BsddSettings.json file
+            var assemblyPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            if (assemblyPath == null)
+            {
+                Log.Warning("Could not determine assembly path, using hardcoded defaults");
+                return CreateHardcodedDefaults();
+            }
+
+            var settingsFilePath = Path.Combine(assemblyPath, "UI", "Settings", "BsddSettings.json");
+
+            if (!File.Exists(settingsFilePath))
+            {
+                // Fallback: also check directly in the assembly directory (in case UI/Settings structure differs)
+                settingsFilePath = Path.Combine(assemblyPath, "BsddSettings.json");
+            }
+
+            if (File.Exists(settingsFilePath))
+            {
+                Log.Information("Loading default settings from: {Path}", settingsFilePath);
+                var json = File.ReadAllText(settingsFilePath);
+                var settings = JsonConvert.DeserializeObject<BridgeSettings>(json);
+
+                if (settings != null)
+                {
+                    // Ensure FilterDictionaries is never null — the JS side calls .map() on this array
+                    settings.FilterDictionaries ??= new List<BsddDictionary>();
+                    Log.Information("Successfully loaded default settings from JSON file");
+                    return settings;
+                }
+
+                Log.Warning("Failed to deserialize settings from {Path}, using hardcoded defaults", settingsFilePath);
+            }
+            else
+            {
+                Log.Warning("BsddSettings.json not found at {Path}, using hardcoded defaults", settingsFilePath);
+            }
+        }
+        catch (Exception ex)
+        {
+            // If file loading fails, fall back to hardcoded defaults
+            Log.Error(ex, "Error loading default settings from JSON file, using hardcoded defaults");
+        }
+
+        return CreateHardcodedDefaults();
+    }
+
+    /// <summary>
+    /// Hardcoded fallback defaults if BsddSettings.json cannot be loaded.
+    /// </summary>
+    private static BridgeSettings CreateHardcodedDefaults()
+    {
         return new BridgeSettings
         {
             BsddApiEnvironment = "production",
             Language = "nl-NL",
-            IncludeTestDictionaries = false
+            IncludeTestDictionaries = false,
+            // Default main dictionary: NL-SfB Tabel 1 (2021)
+            MainDictionary = new BsddDictionary
+            {
+                IfcClassification = new IfcClassification
+                {
+                    Source = "Ketenstandaard Bouw en Techniek",
+                    Edition = "2021",
+                    EditionDate = new DateTime(2024, 12, 18),
+                    Name = "NL-SfB Tabel 1",
+                    Location = "https://data.ketenstandaard.nl/publications/nlsfb/2021",
+                    Description = "Nederlandse classificatie volgens NL-SfB Tabel 1"
+                }
+            },
+            // Default IFC dictionary: IFC 4.3
+            IfcDictionary = new BsddDictionary
+            {
+                IfcClassification = new IfcClassification
+                {
+                    Source = "buildingSMART International",
+                    Edition = "4.3",
+                    Name = "IFC",
+                    Location = "https://identifier.buildingsmart.org/uri/buildingsmart/ifc/4.3",
+                    Description = "Industry Foundation Classes version 4.3"
+                }
+            },
+            // Must be an empty list, not null — the JS side calls .map() on this array
+            // and null.map() throws a TypeError that silently breaks the settings slice,
+            // leaving includeTestDictionaries as undefined → fetchDictionaries never fires.
+            FilterDictionaries = new List<BsddDictionary>()
         };
     }
 }
