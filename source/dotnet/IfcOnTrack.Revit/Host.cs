@@ -100,6 +100,9 @@ public static class Host
         // Views
         services.AddTransient<BsddSearchView>();
         services.AddSingleton<BsddSelectionView>(); // Singleton: same instance in dockable pane
+
+        // Update checking
+        services.AddHttpClient<IfcOnTrack.Core.Update.UpdateChecker>();
     }
 
     /// <summary>

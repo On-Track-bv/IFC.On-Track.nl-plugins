@@ -47,6 +47,9 @@ public class Application : ExternalApplication
         manager.Event = Autodesk.Revit.UI.ExternalEvent.Create(handler);
 
         RegisterDockablePane();
+
+        // Check for updates (async, non-blocking)
+        _ = CheckForUpdatesAsync();
     }
 
     public override void OnShutdown()
@@ -177,6 +180,31 @@ public class Application : ExternalApplication
                 };
             });
         _dockablePaneRegistered = true;
+    }
+
+    // ── Update checking ───────────────────────────────────────────────────────
+
+    private async Task CheckForUpdatesAsync()
+    {
+        try
+        {
+            var updateChecker = Host.TryGetService<IfcOnTrack.Core.Update.UpdateChecker>();
+            if (updateChecker == null) return;
+
+            var currentVersion = GetType().Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
+            var updateInfo = await updateChecker.CheckForUpdateAsync(currentVersion);
+
+            if (updateInfo != null)
+            {
+                // Show update notification in dockable pane
+                var view = Host.TryGetService<BsddSelectionView>();
+                view?.ShowUpdateNotification(updateInfo);
+            }
+        }
+        catch
+        {
+            // Silently fail - update check should never crash the plugin
+        }
     }
 }
 

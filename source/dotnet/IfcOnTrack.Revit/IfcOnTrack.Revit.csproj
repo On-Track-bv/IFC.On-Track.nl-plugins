@@ -39,6 +39,7 @@
     <!-- IOC / Hosting -->
     <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.*" />
+        <PackageReference Include="Microsoft.Extensions.Http" Version="8.*" />
     </ItemGroup>
 
     <!-- JSON -->
