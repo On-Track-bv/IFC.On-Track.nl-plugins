@@ -23,9 +23,15 @@ public static partial class Generator
         foreach (var directory in directories)
         {
             var directoryInfo = new DirectoryInfo(directory);
-            if (!TryParseVersion(directoryInfo.Name, out var fileVersion))
+
+            // If directory is "publish", try to parse version from parent directory (e.g., "Release.R25")
+            var versionSource = directoryInfo.Name == "publish" && directoryInfo.Parent != null
+                ? directoryInfo.Parent.Name
+                : directoryInfo.Name;
+
+            if (!TryParseVersion(versionSource, out var fileVersion))
             {
-                Console.WriteLine($"Warning: Could not parse version from directory name: {directoryInfo.Name}");
+                Console.WriteLine($"Warning: Could not parse version from directory path: {directory}");
                 continue;
             }
 
