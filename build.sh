@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Purpose: Bash entry point for NUKE build system
+# Purpose: Bash entry point for ModularPipelines build system
 
 bash_source="${BASH_SOURCE[0]}"
 while [ -h "$bash_source" ]; do # resolve $bash_source until the file is no longer a symlink
@@ -62,5 +62,4 @@ fi
 
 echo "Microsoft (R) .NET SDK version $("$DOTNET_EXE" --version)"
 
-"$DOTNET_EXE" build "$BUILD_PROJECT_FILE" /nodeReuse:false /p:UseSharedCompilation=false -nologo -clp:NoSummary --verbosity quiet
-"$DOTNET_EXE" run --project "$BUILD_PROJECT_FILE" --no-build -- "$@"
+"$DOTNET_EXE" run --project "$BUILD_PROJECT_FILE" -- "$@"
