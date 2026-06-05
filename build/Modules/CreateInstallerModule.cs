@@ -21,29 +21,30 @@ public sealed class CreateInstallerModule(IOptions<BuildOptions> options) : Modu
         // Get version
         var version = Environment.GetEnvironmentVariable("BUILD_VERSION") ?? options.Value.Version;
 
-        // Collect publish directories for each Revit version (these contain the actual installer files)
-        var publishDirectories = new List<string>();
+        // Collect bin directories for each Revit version (bin root, not publish subfolder)
+        // The Nice3point.Revit.Sdk publishes files with a specific structure that includes .addin
+        var binDirectories = new List<string>();
 
         foreach (var configuration in options.Value.Configurations)
         {
-            var publishPath = Path.Combine(sourceDirectory, "IfcOnTrack.Revit", "bin", configuration, "publish");
+            var binPath = Path.Combine(sourceDirectory, "IfcOnTrack.Revit", "bin", configuration);
 
-            if (Directory.Exists(publishPath))
+            if (Directory.Exists(binPath))
             {
-                publishDirectories.Add(publishPath);
+                binDirectories.Add(binPath);
             }
         }
 
-        if (publishDirectories.Count == 0)
+        if (binDirectories.Count == 0)
         {
-            throw new InvalidOperationException("No publish outputs found. Run compile first.");
+            throw new InvalidOperationException("No build outputs found. Run compile first.");
         }
 
         // Install WiX toolset globally and configure it
         await InstallWixToolsetAsync(cancellationToken);
 
-        // Build arguments: version + all publish directories
-        var arguments = $"run --project \"{installerProject}\" -- \"{version}\" " + string.Join(" ", publishDirectories.Select(d => $"\"{d}\""));
+        // Build arguments: version + all bin directories
+        var arguments = $"run --project \"{installerProject}\" -- \"{version}\" " + string.Join(" ", binDirectories.Select(d => $"\"{d}\""));
 
         // Run installer via dotnet CLI
         var startInfo = new ProcessStartInfo

@@ -24,12 +24,7 @@ public static partial class Generator
         {
             var directoryInfo = new DirectoryInfo(directory);
 
-            // If directory is "publish", try to parse version from parent directory (e.g., "Release.R25")
-            var versionSource = directoryInfo.Name == "publish" && directoryInfo.Parent != null
-                ? directoryInfo.Parent.Name
-                : directoryInfo.Name;
-
-            if (!TryParseVersion(versionSource, out var fileVersion))
+            if (!TryParseVersion(directoryInfo.Name, out var fileVersion))
             {
                 Console.WriteLine($"Warning: Could not parse version from directory path: {directory}");
                 continue;
@@ -44,7 +39,13 @@ public static partial class Generator
 
             revitFeature.Add(feature);
 
-            var files = new Files(feature, $@"{directory}\*.*");
+            // Create Files with unique ID prefix to avoid duplicates across versions
+            var files = new Files(feature, $@"{directory}\*.*")
+            {
+                // Force unique component IDs by including version in the ID
+                Id = new Id($"Files_{fileVersion}")
+            };
+
             if (versionStorages.TryGetValue(fileVersion, out var storage))
             {
                 storage.Add(files);
