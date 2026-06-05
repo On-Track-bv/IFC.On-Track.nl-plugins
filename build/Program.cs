@@ -14,13 +14,13 @@ builder.Configuration.AddCommandLine(args);
 
 builder.Services.AddOptions<BuildOptions>().Bind(builder.Configuration.GetSection("Build"));
 
-// Default: just compile
+// Default: compile only
 if (args.Length == 0)
 {
     builder.Services.AddModule<CompileModule>();
 }
 
-// Clean build
+// Clean only
 if (args.Contains("clean"))
 {
     builder.Services.AddModule<CleanModule>();
@@ -31,6 +31,29 @@ if (args.Contains("build"))
 {
     builder.Services.AddModule<CleanModule>();
     builder.Services.AddModule<CompileModule>();
+}
+
+// Package (compile + package)
+if (args.Contains("pack") || args.Contains("package"))
+{
+    builder.Services.AddModule<CompileModule>();
+    builder.Services.AddModule<PackageModule>();
+}
+
+// Installer (compile + installer)
+if (args.Contains("installer"))
+{
+    builder.Services.AddModule<CompileModule>();
+    builder.Services.AddModule<CreateInstallerModule>();
+}
+
+// Full release (clean + compile + package + installer)
+if (args.Contains("release"))
+{
+    builder.Services.AddModule<CleanModule>();
+    builder.Services.AddModule<CompileModule>();
+    builder.Services.AddModule<PackageModule>();
+    builder.Services.AddModule<CreateInstallerModule>();
 }
 
 await builder.Build().RunAsync();

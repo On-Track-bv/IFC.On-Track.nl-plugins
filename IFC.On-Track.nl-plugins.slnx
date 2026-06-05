@@ -5,6 +5,11 @@
         <BuildType Name="Release.R25" />
         <BuildType Name="Release.R26" />
     </Configurations>
+    <Folder Name="/install/">
+        <Project Path="install/Installer.csproj">
+            <BuildType Project="Debug" />
+        </Project>
+    </Folder>
     <Folder Name="/Solution Items/">
         <File Path=".gitignore" />
         <File Path="README.md" />
