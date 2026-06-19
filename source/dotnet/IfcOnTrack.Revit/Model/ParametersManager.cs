@@ -48,12 +48,11 @@ public class ParametersManager
         if (!parametersToCreate.Any()) return;
 
         var originalSharedParamFile = doc.Application.SharedParametersFilename;
-        var tempFile = Path.GetTempFileName() + ".txt";
+        var tempFile = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".txt");
 
         try
         {
-            // Use an empty temp file as shared parameter store
-            using (File.Create(tempFile)) { }
+            File.WriteAllText(tempFile, string.Empty);
             doc.Application.SharedParametersFilename = tempFile;
 
             var categories = categoryList == null

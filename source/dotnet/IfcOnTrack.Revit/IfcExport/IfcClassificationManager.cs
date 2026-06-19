@@ -287,5 +287,10 @@ public class RevitIfcClassification
     public string? FieldName { get; set; }
 
     public bool Equals(RevitIfcClassification other)
-        => Name == other.Name && Location == other.Location && Edition == other.Edition;
+        => other != null
+           && Name == other.Name
+           && Source == other.Source
+           && Edition == other.Edition
+           && Location == other.Location
+           && FieldName == other.FieldName;
 }

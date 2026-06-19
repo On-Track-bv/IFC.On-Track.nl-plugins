@@ -18,9 +18,8 @@ public static class UuidFromUri
     /// </summary>
     public static Guid CreateUuidFromUri(string input)
     {
-        byte[] data = SHA1.Create().ComputeHash(Encoding.UTF8.GetBytes(input));
-        var hashedGuid = new Guid(data.Take(16).ToArray());
-        return CreateGuidV5(BsddNamespace, hashedGuid.ToByteArray());
+        if (input == null) throw new ArgumentNullException(nameof(input));
+        return CreateGuidV5(BsddNamespace, Encoding.UTF8.GetBytes(input));
     }
 
     private static Guid CreateGuidV5(Guid namespaceId, byte[] nameBytes)

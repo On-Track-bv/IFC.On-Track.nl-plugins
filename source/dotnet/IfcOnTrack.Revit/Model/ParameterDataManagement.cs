@@ -96,15 +96,15 @@ public class ParameterDataManagement
                 parametersToCreate.Add(new ParameterCreation(
                     instanceName, specType,
                     _parametersManager.ExistingProjectParameter(doc, instanceName), true));
+                parametersToSet[instanceName] = $"{classRef.Identification}:{classRef.Name}";
             }
             else
             {
                 parametersToCreate.Add(new ParameterCreation(
                     bsddParamName, specType,
                     _parametersManager.ExistingProjectParameter(doc, bsddParamName), false));
+                parametersToSet[bsddParamName] = $"{classRef.Identification}:{classRef.Name}";
             }
-
-            parametersToSet[bsddParamName] = $"{classRef.Identification}:{classRef.Name}";
 
             if (classRef.ReferencedSource != null)
                 dictionaryCollection.Add(classRef.ReferencedSource);
