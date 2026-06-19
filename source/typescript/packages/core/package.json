@@ -1,0 +1,17 @@
+{
+  "name": "@ifc-on-track/core",
+  "version": "1.0.0",
+  "description": "Shared bridge types for IFC.On-Track.nl plugins",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "generate-types": "json-schema-to-typescript ../../../../contracts/bridge-data.schema.json --out src/generated"
+  },
+  "files": ["dist"],
+  "devDependencies": {
+    "json-schema-to-typescript": "^15.0.0",
+    "typescript": "^5.8.0"
+  }
+}

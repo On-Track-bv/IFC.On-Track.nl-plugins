@@ -4,9 +4,13 @@ using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Serilog;
+using Serilog.Events;
 using IfcOnTrack.Core.License;
 using IfcOnTrack.Core.UI;
 using IfcOnTrack.Revit.Bridge;
+using IfcOnTrack.Revit.Commands;
+using IfcOnTrack.Revit.IfcExport;
 using IfcOnTrack.Revit.Model;
 using IfcOnTrack.Revit.UI;
 using IfcOnTrack.Revit.ViewModels;
@@ -23,7 +27,7 @@ public static class Host
     /// <summary>
     /// Gets the service provider for DI resolution.
     /// </summary>
-    public static IServiceProvider ServiceProvider => 
+    public static IServiceProvider ServiceProvider =>
         _host?.Services ?? throw new InvalidOperationException("Host not started");
 
     /// <summary>
@@ -31,44 +35,74 @@ public static class Host
     /// </summary>
     public static void Start()
     {
+        // Logging (Serilog → Debug output + rolling file)
+        var logPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "IFC.On-Track.nl", "logs", "plugin-.log");
+        Log.Logger = new LoggerConfiguration()
+            .WriteTo.Debug(LogEventLevel.Debug)
+            .WriteTo.File(logPath, rollingInterval: RollingInterval.Day,
+                retainedFileCountLimit: 7, restrictedToMinimumLevel: LogEventLevel.Debug)
+            .MinimumLevel.Debug()
+            .CreateLogger();
+
         var builder = new HostApplicationBuilder(new HostApplicationBuilderSettings
         {
             ContentRootPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location),
             DisableDefaults = true
         });
 
-        // Configure logging
-        builder.Services.AddLogging(logging =>
-        {
-            logging.AddDebug();
-            logging.SetMinimumLevel(LogLevel.Debug);
-        });
+        builder.Logging.ClearProviders();
+        builder.Logging.AddSerilog(Log.Logger);
 
-        // Core services
-        builder.Services.AddSingleton<LicenseManager>();
-        builder.Services.AddSingleton(sp => new UiLoader(
-            Application.PluginDirectory,
-            sp.GetRequiredService<ILogger<UiLoader>>()
-        ));
-
-        // Model managers
-        builder.Services.AddSingleton<ElementsManager>();
-        builder.Services.AddSingleton<SettingsManager>();
-
-        // JavaScript bridges (singleton for persistent state)
-        builder.Services.AddSingleton<BsddSelectionBridge>();
-        builder.Services.AddTransient<BsddSearchBridge>();
-
-        // ViewModels
-        builder.Services.AddTransient<BsddViewModel>();
-
-        // Views
-        builder.Services.AddTransient<BsddWindow>();
-        builder.Services.AddTransient<BsddSelectionView>();
-        builder.Services.AddTransient<BsddSearchView>();
+        ConfigureServices(builder.Services);
 
         _host = builder.Build();
         _host.Start();
+    }
+
+    private static void ConfigureServices(IServiceCollection services)
+    {
+        // Core services
+        services.AddSingleton<LicenseManager>();
+        services.AddSingleton(sp => new UiLoader(
+            Application.PluginDirectory,
+            sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<UiLoader>>()
+        ));
+
+        // Settings (singleton – one settings state per Revit session)
+        services.AddSingleton<SettingsManager>();
+
+        // Parameter management
+        services.AddSingleton<ParametersManager>();
+        services.AddSingleton<ParameterDataManagement>();
+
+        // Element data management
+        services.AddSingleton<ElementsManager>();
+        services.AddSingleton<LastSelectionCache>();
+
+        // Selection event infrastructure (ExternalEvent created in Application.OnStartup)
+        services.AddSingleton<SelectionEventHandler>();
+        services.AddSingleton<SelectionEventManager>();
+
+        // IFC Export pipeline
+        services.AddSingleton<IfcClassificationManager>();
+        services.AddSingleton<IfcPostprocessor>();
+        services.AddSingleton<IfcExportService>();
+
+        // JavaScript bridges (singleton for persistent state)
+        services.AddSingleton<BsddSelectionBridge>();
+        services.AddTransient<BsddSearchBridge>();
+
+        // ViewModels
+        services.AddTransient<BsddViewModel>();
+
+        // Views
+        services.AddTransient<BsddSearchView>();
+        services.AddSingleton<BsddSelectionView>(); // Singleton: same instance in dockable pane
+
+        // Update checking
+        services.AddHttpClient<IfcOnTrack.Core.Update.UpdateChecker>();
     }
 
     /// <summary>
@@ -77,24 +111,20 @@ public static class Host
     public static void Stop()
     {
         _host?.StopAsync().GetAwaiter().GetResult();
+        Log.CloseAndFlush();
     }
 
     /// <summary>
-    /// Get service of type T.
+    /// Get service of type T. Throws if not found.
     /// </summary>
-    /// <typeparam name="T">The type of service object to get</typeparam>
-    /// <exception cref="InvalidOperationException">There is no service of type T</exception>
     public static T GetService<T>() where T : class
     {
-        return _host?.Services.GetRequiredService<T>() 
-            ?? throw new InvalidOperationException($"Host not started. Call Host.Start() first.");
+        return ServiceProvider.GetRequiredService<T>();
     }
 
     /// <summary>
-    /// Try to get service of type T.
+    /// Try to get service of type T – returns null if not found or host not started.
     /// </summary>
-    /// <typeparam name="T">The type of service object to get</typeparam>
-    /// <returns>Service instance or null if not found</returns>
     public static T? TryGetService<T>() where T : class
     {
         return _host?.Services.GetService<T>();

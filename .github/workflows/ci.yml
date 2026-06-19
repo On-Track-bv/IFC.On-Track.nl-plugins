@@ -1,106 +1,175 @@
-# Purpose: Build and test workflow for IFC.On-Track.nl plugins
 name: CI
 
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
 
 env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
 
 jobs:
-  # ─── .NET (Revit / Tekla) ────────────────────────────────────────────────────
-  dotnet:
-    name: dotnet (${{ matrix.configuration }})
-    runs-on: windows-latest
-
-    strategy:
-      matrix:
-        configuration: ['Release.R24', 'Release.R25', 'Release.R26']
-
+  # ─── Detect what changed ────────────────────────────────────────────────────
+  detect-changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      core: ${{ steps.filter.outputs.core }}
+      revit: ${{ steps.filter.outputs.revit }}
+      typescript: ${{ steps.filter.outputs.typescript }}
+      build: ${{ steps.filter.outputs.build }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            core:
+              - 'source/dotnet/IfcOnTrack.Core/**'
+              - 'Directory.Build.props'
+              - 'global.json'
+            revit:
+              - 'source/dotnet/IfcOnTrack.Revit/**'
+              - 'install/**'
+            typescript:
+              - 'source/typescript/**'
+            build:
+              - 'build/**'
+              - '.github/workflows/**'
+
+  # ─── Revit: compile + MSI ───────────────────────────────────────────────────
+  # Runs on both PRs and main pushes.
+  # On PRs:        artifacts are downloadable from the Actions run UI.
+  # On main push:  the publish-staging job picks them up for the staging release.
+  build-revit:
+    name: Build Revit installer
+    needs: detect-changes
+    if: |
+      needs.detect-changes.outputs.core == 'true' ||
+      needs.detect-changes.outputs.revit == 'true' ||
+      needs.detect-changes.outputs.build == 'true'
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: 10.0.x
 
-      - name: Restore
-        run: dotnet restore -p:Configuration="${{ matrix.configuration }}"
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'Directory.Build.props') }}
+          restore-keys: ${{ runner.os }}-nuget-
 
-      - name: Build
-        run: dotnet build -c "${{ matrix.configuration }}" --no-restore
+      - name: Build release artifacts
+        run: dotnet run --project build -c Release -- release
+        env:
+          # Staging version: 0.0.<run_number> — valid MSI version, always below any real release
+          BUILD_VERSION: 0.0.${{ github.run_number }}
+
+      # Sign MSI installers when building for main (staging).
+      # PR builds are left unsigned — fine for internal testing.
+      # Uses OIDC (no client secret needed — set up federated credential in Azure).
+      - name: Sign MSI installers
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        continue-on-error: true
+        uses: azure/artifact-signing-action@v0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.AZURE_ARTIFACT_SIGNING_ENDPOINT }}
+          code-signing-account-name: ${{ secrets.AZURE_ARTIFACT_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.AZURE_ARTIFACT_SIGNING_PROFILE }}
+          files-folder: output/
+          files-folder-filter: msi
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: plugins-${{ matrix.configuration }}
-          path: output/
-          if-no-files-found: warn
+          name: revit-installer
+          path: |
+            output/*.msi
+            output/*.zip
+          retention-days: 14
 
-  # ─── TypeScript ──────────────────────────────────────────────────────────────
-  typescript:
-    name: typescript
+  # ─── Staging release (main only) ────────────────────────────────────────────
+  # Updates the rolling 'staging' GitHub pre-release so the staging website
+  # always links to the latest build from main.
+  publish-staging:
+    name: Publish staging release
+    needs: build-revit
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: source/typescript
-
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: revit-installer
+          path: output/
+
+      - name: Update staging release
+        shell: bash
+        run: |
+          # Remove existing staging release and tag so we can recreate it cleanly
+          gh release delete staging --yes 2>/dev/null || true
+          git push origin :refs/tags/staging 2>/dev/null || true
+
+          gh release create staging \
+            --prerelease \
+            --title "Staging (build ${{ github.run_number }})" \
+            --notes "Staging build from commit ${{ github.sha }}
+
+          Install this to test the latest changes before a production release." \
+            output/*.msi output/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ─── TypeScript ─────────────────────────────────────────────────────────────
+  validate-typescript:
+    name: TypeScript
+    needs: detect-changes
+    if: |
+      needs.detect-changes.outputs.typescript == 'true' ||
+      needs.detect-changes.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: source/typescript
+    steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
           cache-dependency-path: source/typescript/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
 
-      - name: Install
-        run: npm ci
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Build
-        run: npm run build
-
-  # ─── Release (main only) ─────────────────────────────────────────────────────
-  release:
-    needs: [dotnet, typescript]
-    runs-on: windows-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 8.0.x
-
-      - name: Install NUKE
-        run: dotnet tool install Nuke.GlobalTool --global
-
-      - name: Build with NUKE
-        run: nuke Compile
-        env:
-          BUILD_VERSION: ${{ github.run_number }}
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts/
-
-      # TODO: Add installer creation step
-      # TODO: Add GitHub release creation step
+  # ─── Adding a new plugin? ────────────────────────────────────────────────────
+  # 1. Add a paths-filter entry in detect-changes (e.g. 'tekla')
+  # 2. Copy build-revit, rename to build-tekla
+  # 3. Update the if condition, the dotnet build path, and the artifact name
+  # 4. Add the plugin to build/appsettings.json

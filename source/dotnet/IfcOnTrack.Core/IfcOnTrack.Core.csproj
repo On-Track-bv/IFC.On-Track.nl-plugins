@@ -1,29 +1,25 @@
 <!-- Purpose: Shared core library for all IFC.On-Track plugins -->
 <!-- Using Nice3point.Revit.Sdk for multi-version support -->
-<Project Sdk="Nice3point.Revit.Sdk/6.1.0">
+<Project Sdk="Nice3point.Revit.Sdk/6.2.0">
 
     <PropertyGroup>
         <RootNamespace>IfcOnTrack.Core</RootNamespace>
         <AssemblyName>IfcOnTrack.Core</AssemblyName>
         <UseWPF>true</UseWPF>
-        <Configurations>Debug.R24;Debug.R25;Debug.R26</Configurations>
-        <Configurations>$(Configurations);Release.R24;Release.R25;Release.R26</Configurations>
+        <Configurations>Debug.R25;Debug.R26</Configurations>
+        <Configurations>$(Configurations);Release.R25;Release.R26</Configurations>
     </PropertyGroup>
 
-    <!-- CefSharp for .NET Framework (Revit 2024) -->
-    <ItemGroup Condition="'$(RevitVersion)' == '2024'">
-        <PackageReference Include="CefSharp.Wpf" Version="146.*" />
-    </ItemGroup>
-    
-    <!-- WebView2 for .NET 8 targets (Revit 2025+) -->
-    <ItemGroup Condition="'$(RevitVersion)' != '2024'">
+    <!-- WebView2 for .NET 8 (Revit 2025+) -->
+    <ItemGroup>
         <PackageReference Include="Microsoft.Web.WebView2" Version="1.*" />
     </ItemGroup>
 
     <!-- Common packages -->
     <ItemGroup>
-        <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+        <PackageReference Include="Newtonsoft.Json" Version="13.*" />
         <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.*" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.*" />
     </ItemGroup>
 
 </Project>

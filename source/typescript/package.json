@@ -6,7 +6,7 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck": "npm run build -w @ifc-on-track/core && npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "generate-types": "json-schema-to-typescript ../../contracts/bridge-data.schema.json --out packages/core/src/generated"
   },

@@ -16,7 +16,7 @@ public class ShowBsddPanelCommand : ExternalCommand
     public override void Execute()
     {
         var paneId = new DockablePaneId(IfcOnTrack.Revit.Application.BsddSelectionPaneId);
-        var pane = UiApplication.GetDockablePane(paneId);
+        var pane = Application.GetDockablePane(paneId);
         
         if (pane == null)
         {

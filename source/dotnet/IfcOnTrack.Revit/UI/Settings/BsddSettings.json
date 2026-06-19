@@ -1,0 +1,41 @@
+{
+  "bsddApiEnvironment": "production",
+  "language": "nl-NL",
+  "mainDictionary": {
+    "ifcClassification": {
+      "type": "IfcClassification",
+      "source": "Ketenstandaard Bouw en Techniek",
+      "edition": "2021",
+      "editionDate": "2024-12-18T00:00:00",
+      "name": "NL-SfB Tabel 1",
+      "location": "https://data.ketenstandaard.nl/publications/nlsfb/2021",
+      "description": "Nederlandse classificatie volgens NL-SfB Tabel 1"
+    },
+    "parameterMapping": "Classification"
+  },
+  "ifcDictionary": {
+    "ifcClassification": {
+      "type": "IfcClassification",
+      "source": "buildingSMART International",
+      "edition": "4.3",
+      "name": "IFC",
+      "location": "https://identifier.buildingsmart.org/uri/buildingsmart/ifc/4.3",
+      "description": "Industry Foundation Classes version 4.3"
+    },
+    "parameterMapping": "IFC Properties"
+  },
+  "filterDictionaries": [
+    {
+      "ifcClassification": {
+        "type": "IfcClassification",
+        "source": "ETIM International",
+        "edition": "9.0",
+        "name": "ETIM",
+        "location": "https://identifier.buildingsmart.org/uri/etim/etim/9.0",
+        "description": "Electro-Technical Information Model"
+      },
+      "parameterMapping": "ETIM"
+    }
+  ],
+  "includeTestDictionaries": false
+}

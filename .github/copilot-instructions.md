@@ -7,7 +7,7 @@
 ## Quick Start
 
 ```powershell
-# Prerequisites: .NET 8 SDK, .NET Framework 4.8, Revit 2024/2025/2026
+# Prerequisites: .NET 8 SDK, Revit 2025/2026
 
 # Clone and build
 git clone https://github.com/on-track-nl/IFC.On-Track.nl-plugins.git
@@ -20,7 +20,7 @@ dotnet tool install Nuke.GlobalTool --global
 nuke
 ```
 
-**Tech Stack:** C# 12, .NET 8 / .NET Framework 4.8, Nice3point.Revit.Toolkit, NUKE Build
+**Tech Stack:** C# 12, .NET 8, Nice3point.Revit.Toolkit, NUKE Build, WebView2
 
 ## Architecture Overview
 
@@ -50,16 +50,15 @@ Run `npm run generate-types` in `source/typescript` to regenerate TypeScript typ
 1. **Core handles all shared logic** - Bridge interface, UI loading, license management
 2. **Plugins are thin wrappers** - Convert host data to/from BridgeData format
 3. **UI is loaded from CDN or local bundle** - Never embedded in plugin DLL
-4. **Multi-target support** - R24 (net48), R25/R26 (net8.0-windows)
+4. **WebView2 for all** - .NET 8 + WebView2 for Revit 2025+
 
 ## Build Configurations
 
 | Configuration | Target Framework | Revit Version |
 |---------------|------------------|---------------|
-| Debug R24     | net48            | 2024          |
-| Debug R25     | net8.0-windows   | 2025          |
-| Debug R26     | net8.0-windows   | 2026          |
-| Release R*    | Same as Debug    | Production    |
+| Debug.R25     | net8.0-windows   | 2025          |
+| Debug.R26     | net8.0-windows   | 2026          |
+| Release.R*    | Same as Debug    | Production    |
 
 ## Git Workflow
 
