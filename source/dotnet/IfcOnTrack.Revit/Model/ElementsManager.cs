@@ -138,7 +138,7 @@ public class ElementsManager
 
     /// <summary>
     /// Apply bridge data (from UI save) to Revit elements.
-    /// Creates project parameters and writes values. Must be called inside a transaction.
+    /// Creates project parameters and writes values. Manages its own transactions internally.
     /// </summary>
     public void ApplyBridgeData(Document doc, BridgeData bridgeData)
     {
@@ -183,17 +183,23 @@ public class ElementsManager
 
             var categoryList = new List<Category> { doc.Settings.Categories.get_Item(builtInCat) };
 
-            using var createTx = new Transaction(doc, "Create bSDD parameters");
-            createTx.Start();
-            _parametersManager.CreateProjectParameters(doc, parametersToCreate, "bSDD", groupType, categoryList);
-            createTx.Commit();
-
-            if (parametersToCreate.Any(p => p.IsInstance))
+            using (var createTx = new Transaction(doc, "Create bSDD parameters"))
             {
-                using var instanceTx = new Transaction(doc, "Update instance parameters");
-                instanceTx.Start();
-                _parametersManager.SetInstanceParameterVaryBetweenGroups(doc, parametersToCreate, true);
-                instanceTx.Commit();
+                createTx.Start();
+                _parametersManager.CreateProjectParameters(doc, parametersToCreate, "bSDD", groupType, categoryList);
+                createTx.Commit();
+            }
+
+            if (parametersToSet.Any())
+            {
+                var instances = new FilteredElementCollector(doc)
+                    .OfCategory(builtInCat)
+                    .WhereElementIsNotElementType()
+                    .ToElements();
+                using var setTx = new Transaction(doc, "Set bSDD parameter values");
+                setTx.Start();
+                _parametersManager.SetElementsParameters(instances, parametersToSet);
+                setTx.Commit();
             }
         }
         else

@@ -114,25 +114,40 @@ public class ParametersManager
     }
 
     /// <summary>
-    /// Enables VaryBetweenGroups for instance parameters listed in parametersToCreate.
+    /// Sets parameter values on a collection of elements (e.g. all Rooms or Areas in a document).
+    /// Skips read-only parameters and parameters not present on the element.
+    /// Must be called inside an active transaction.
+    /// </summary>
+    public void SetElementsParameters(IEnumerable<Element> elements, Dictionary<string, object?> parametersToSet)
+    {
+        foreach (var element in elements)
+        {
+            foreach (var kvp in parametersToSet)
+            {
+                try
+                {
+                    var param = element.LookupParameter(kvp.Key);
+                    if (param is null || param.IsReadOnly) continue;
+                    SetParameterValue(param, kvp.Value);
+                    _logger.LogDebug("Set parameter '{Name}' = '{Value}' on '{Element}'", kvp.Key, kvp.Value, element.Name);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to set parameter '{Name}' on '{Element}'", kvp.Key, element.Name);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// VaryBetweenGroups cannot be set via the public Revit API on existing parameters.
+    /// This method is intentionally a no-op — parameter creation defaults leave groups enabled,
+    /// which is the desired behaviour for bSDD instance parameters.
     /// </summary>
     public void SetInstanceParameterVaryBetweenGroups(Document doc, List<ParameterCreation> parametersToCreate, bool varyBetweenGroups)
     {
-        var map = doc.ParameterBindings;
-        var it = map.ForwardIterator();
-        while (it.MoveNext())
-        {
-            if (it.Key?.Name is not string name) continue;
-            var pc = parametersToCreate.FirstOrDefault(p => p.ParameterName == name && p.IsInstance);
-            if (pc == null) continue;
-
-            if (it.Current is InstanceBinding binding)
-            {
-                // Re-insert with VaryBetweenGroups enforcement – Revit API doesn't expose a setter,
-                // so we rely on the insertion behaviour which defaults allow groups already.
-                _logger.LogDebug("Instance parameter '{Name}' bound", name);
-            }
-        }
+        // The Revit API does not expose a VaryBetweenGroups setter on ParameterBinding.
+        // New instance parameters default to varyBetweenGroups=true, which is correct for bSDD.
     }
 
     private void CreateSingleParameter(

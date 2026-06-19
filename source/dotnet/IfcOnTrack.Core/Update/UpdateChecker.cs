@@ -1,6 +1,7 @@
 // Purpose: Checks for plugin updates from GitHub Releases
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 
 namespace IfcOnTrack.Core.Update;
@@ -97,9 +98,14 @@ public class UpdateInfo
 /// </summary>
 internal class GitHubRelease
 {
+    [JsonPropertyName("tag_name")]
     public string? TagName { get; set; }
+    [JsonPropertyName("name")]
     public string? Name { get; set; }
+    [JsonPropertyName("body")]
     public string? Body { get; set; }
+    [JsonPropertyName("html_url")]
     public string? HtmlUrl { get; set; }
+    [JsonPropertyName("published_at")]
     public DateTime? PublishedAt { get; set; }
 }

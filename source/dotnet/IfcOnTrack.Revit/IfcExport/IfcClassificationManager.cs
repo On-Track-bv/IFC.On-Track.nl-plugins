@@ -239,7 +239,7 @@ public class IfcClassificationManager
         }
         else
         {
-            entity.Set<string>(schema.GetField(FieldFieldName), string.Empty);
+            entity.Set<string>(schema.GetField(FieldFieldName), classification.FieldName ?? string.Empty);
         }
 
         return entity;

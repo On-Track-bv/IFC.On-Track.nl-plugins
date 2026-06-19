@@ -71,6 +71,7 @@ public class SettingsManager
             var loaded = JsonConvert.DeserializeObject<BridgeSettings>(json) ?? GetDefaultSettings();
             // Ensure FilterDictionaries is never null — JS calls .map() on it
             loaded.FilterDictionaries ??= new List<BsddDictionary>();
+            _cachedSettings = loaded;
             return loaded;
         }
         catch (Exception ex)

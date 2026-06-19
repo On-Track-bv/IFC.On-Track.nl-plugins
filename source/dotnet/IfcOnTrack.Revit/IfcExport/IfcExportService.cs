@@ -157,7 +157,7 @@ public class IfcExportService
             var paramsByPset = GroupByPropertySet(bsddParameters);
             var content = BuildUdpsContent(paramsByPset);
 
-            var tempFile = Path.GetTempFileName().Replace(".tmp", ".txt");
+            var tempFile = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".txt");
             File.WriteAllText(tempFile, content);
             return tempFile;
         }
@@ -179,7 +179,7 @@ public class IfcExportService
             foreach (Parameter param in element.Parameters)
             {
                 var name = param.Definition?.Name;
-                if (!string.IsNullOrEmpty(name) && name.StartsWith("bsdd/prop/") && seen.Add(name))
+                if (!string.IsNullOrEmpty(name) && name.StartsWith("bsdd/prop/", StringComparison.Ordinal) && seen.Add(name))
                     result.Add(param);
             }
         }
