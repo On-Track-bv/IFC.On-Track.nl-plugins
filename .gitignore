@@ -39,6 +39,7 @@ bld/
 *.snupkg
 **/[Pp]ackages/*
 !**/[Pp]ackages/build/
+!source/typescript/packages/**
 *.nuget.props
 *.nuget.targets
 project.lock.json
@@ -123,6 +124,11 @@ output/**/ui/
 output/**/ui-embedded/
 installer/**/ui/
 installer/**/ui-embedded/
+
+# Node.js
+node_modules/
+source/typescript/**/dist/
+**/*.tsbuildinfo
 
 # Local development
 *.local
