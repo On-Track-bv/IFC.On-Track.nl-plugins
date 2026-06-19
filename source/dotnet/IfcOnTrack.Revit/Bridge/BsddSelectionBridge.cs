@@ -6,6 +6,7 @@ using Newtonsoft.Json;
 using Nice3point.Revit.Toolkit.External.Handlers;
 using IfcOnTrack.Core.Bridge;
 using IfcOnTrack.Revit.Model;
+using IfcOnTrack.Revit.Utilities;
 
 namespace IfcOnTrack.Revit.Bridge;
 
@@ -113,6 +114,7 @@ public class BsddSelectionBridge
             {
                 var doc = app.ActiveUIDocument?.Document;
                 var settings = doc != null ? _settingsManager.LoadSettings(doc) : new BridgeSettings();
+                settings.DisplayScale = DisplayScaleUtility.GetScale();
                 var propMap = doc != null ? _elementsManager.GetProjectParameterTypes(doc) : new Dictionary<string, bool>();
 
                 // Send the entities selected for editing to the search window
@@ -208,8 +210,9 @@ public class BsddSelectionBridge
                 var doc = app.ActiveUIDocument?.Document;
                 if (doc == null)
                     return JsonConvert.SerializeObject(new BridgeData());
-                
+
                 var settings = _settingsManager.LoadSettings(doc);
+                settings.DisplayScale = DisplayScaleUtility.GetScale();
                 var propMap = _elementsManager.GetProjectParameterTypes(doc);
 
                 return JsonConvert.SerializeObject(new BridgeData
@@ -241,6 +244,7 @@ public class BsddSelectionBridge
             {
                 var doc = app.ActiveUIDocument?.Document;
                 var settings = doc != null ? _settingsManager.LoadSettings(doc) : new BridgeSettings();
+                settings.DisplayScale = DisplayScaleUtility.GetScale();
                 return JsonConvert.SerializeObject(settings);
             });
         }

@@ -5,5 +5,12 @@ public sealed class BuildOptions
 {
     public string Version { get; set; } = "1.0.0";
 
-    public string[] Configurations { get; set; } = ["Release.R25", "Release.R26"];
+    public PluginOptions[] Plugins { get; set; } = [];
+}
+
+public sealed class PluginOptions
+{
+    public string Name { get; set; } = "";
+
+    public string[] Configurations { get; set; } = [];
 }

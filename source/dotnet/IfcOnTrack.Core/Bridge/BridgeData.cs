@@ -315,6 +315,9 @@ public class BridgeSettings
 
     [JsonProperty("includeTestDictionaries")]
     public bool IncludeTestDictionaries { get; set; }
+
+    [JsonProperty("displayScale")]
+    public double? DisplayScale { get; set; }
 }
 
 /// <summary>

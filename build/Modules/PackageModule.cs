@@ -1,4 +1,4 @@
-// Purpose: Package build outputs into distributable archives
+// Purpose: Package build outputs into distributable archives per plugin
 using System.IO.Compression;
 using Build.Options;
 using Microsoft.Extensions.Options;
@@ -17,64 +17,50 @@ public sealed class PackageModule(IOptions<BuildOptions> options) : Module
         var rootDirectory = context.Git().RootDirectory;
         var outputDirectory = Path.Combine(rootDirectory.Path, "output");
         var sourceDirectory = Path.Combine(rootDirectory.Path, "source", "dotnet");
-
-        // Ensure output directory exists
-        Directory.CreateDirectory(outputDirectory);
-
-        // Get version
         var version = Environment.GetEnvironmentVariable("BUILD_VERSION") ?? options.Value.Version;
 
-        foreach (var configuration in options.Value.Configurations)
+        Directory.CreateDirectory(outputDirectory);
+
+        foreach (var plugin in options.Value.Plugins)
         {
-            // Extract Revit version (e.g., "R25" from "Release.R25")
-            var revitVersion = configuration.Split('.').Last();
+            var pluginBinRoot = Path.Combine(sourceDirectory, $"IfcOnTrack.{plugin.Name}", "bin");
 
-            // Source: bin folder of Revit plugin
-            var binPath = Path.Combine(sourceDirectory, "IfcOnTrack.Revit", "bin", configuration);
-
-            if (!Directory.Exists(binPath))
+            // Per-configuration ZIPs (e.g. IfcOnTrack.Revit-v1.2.3-R25.zip)
+            foreach (var configuration in plugin.Configurations)
             {
-                continue;
-            }
-
-            // Target ZIP file
-            var zipFileName = $"IfcOnTrack.Revit-v{version}-{revitVersion}.zip";
-            var zipPath = Path.Combine(outputDirectory, zipFileName);
-
-            // Delete existing ZIP if present
-            if (File.Exists(zipPath))
-            {
-                File.Delete(zipPath);
-            }
-
-            // Create ZIP from bin folder
-            ZipFile.CreateFromDirectory(binPath, zipPath, CompressionLevel.Optimal, includeBaseDirectory: false);
-        }
-
-        // Create combined package with both versions
-        var combinedZipName = $"IfcOnTrack.Revit-v{version}-All.zip";
-        var combinedZipPath = Path.Combine(outputDirectory, combinedZipName);
-
-        if (File.Exists(combinedZipPath))
-        {
-            File.Delete(combinedZipPath);
-        }
-
-        using (var archive = ZipFile.Open(combinedZipPath, ZipArchiveMode.Create))
-        {
-            foreach (var configuration in options.Value.Configurations)
-            {
-                var revitVersion = configuration.Split('.').Last();
-                var binPath = Path.Combine(sourceDirectory, "IfcOnTrack.Revit", "bin", configuration);
-
+                var binPath = Path.Combine(pluginBinRoot, configuration);
                 if (!Directory.Exists(binPath))
                     continue;
 
-                // Add files to ZIP with subfolder per Revit version
+                var suffix = configuration.Split('.').Last();
+                var zipPath = Path.Combine(outputDirectory, $"IfcOnTrack.{plugin.Name}-v{version}-{suffix}.zip");
+
+                if (File.Exists(zipPath))
+                    File.Delete(zipPath);
+
+                ZipFile.CreateFromDirectory(binPath, zipPath, CompressionLevel.Optimal, includeBaseDirectory: false);
+            }
+
+            // Combined ZIP with all versions (e.g. IfcOnTrack.Revit-v1.2.3-All.zip)
+            var combinedZipPath = Path.Combine(outputDirectory, $"IfcOnTrack.{plugin.Name}-v{version}-All.zip");
+
+            if (File.Exists(combinedZipPath))
+                File.Delete(combinedZipPath);
+
+            using var archive = ZipFile.Open(combinedZipPath, ZipArchiveMode.Create);
+
+            foreach (var configuration in plugin.Configurations)
+            {
+                var binPath = Path.Combine(pluginBinRoot, configuration);
+                if (!Directory.Exists(binPath))
+                    continue;
+
+                var suffix = configuration.Split('.').Last();
+
                 foreach (var file in Directory.GetFiles(binPath, "*", SearchOption.AllDirectories))
                 {
                     var relativePath = Path.GetRelativePath(binPath, file);
-                    var entryName = Path.Combine(revitVersion, relativePath).Replace('\\', '/');
+                    var entryName = Path.Combine(suffix, relativePath).Replace('\\', '/');
                     archive.CreateEntryFromFile(file, entryName, CompressionLevel.Optimal);
                 }
             }

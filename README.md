@@ -6,11 +6,11 @@ These plugins embed the [IFC.On-Track.nl](https://ifc.on-track.nl) platform into
 
 ## Supported Applications
 
-| Application | Status | Revit Versions |
-|-------------|--------|----------------|
-| Autodesk Revit | ✅ Active | 2025, 2026 |
-| Tekla Structures | 🚧 Planned | - |
-| Trimble Connect | 🔗 Web-based | N/A |
+| Application | Status | Docs |
+|---|---|---|
+| Autodesk Revit | ✅ Active | [README](source/dotnet/IfcOnTrack.Revit/README.md) |
+| Tekla Structures | 🚧 Planned | — |
+| Trimble Connect | 🔗 Web-based | — |
 
 ## Architecture
 
@@ -37,70 +37,49 @@ These plugins embed the [IFC.On-Track.nl](https://ifc.on-track.nl) platform into
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Quick Start (Development)
-
-### Prerequisites
-
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
-- Autodesk Revit 2025 or 2026
-- [NUKE](https://nuke.build/) (optional, for full build)
-
-### Build & Debug
-
-```powershell
-# Clone repository
-git clone https://github.com/on-track-nl/IFC.On-Track.nl-plugins.git
-cd IFC.On-Track.nl-plugins
-
-# Restore and build (Nice3point SDK requires config-specific restore)
-dotnet restore -p:Configuration="Debug.R25"
-dotnet build -c "Debug.R25"
-
-# Or use NUKE for full build
-dotnet tool install Nuke.GlobalTool --global
-nuke
-```
-
-### Debug in Revit
-
-1. Open `IfcOnTrackPlugins.sln` in Visual Studio or Rider
-2. Set `IfcOnTrack.Revit` as startup project
-3. Configure debug settings:
-   - Start external program: `C:\Program Files\Autodesk\Revit 2025\Revit.exe`
-   - Start arguments: `/language ENG`
-4. Press F5 to debug
-
 ## Project Structure
 
 ```
 IFC.On-Track.nl-plugins/
 ├── source/
-│   ├── IfcOnTrack.Core/          # Shared library (UI loader, bridge, license)
-│   ├── IfcOnTrack.Revit/         # Revit plugin
-│   └── IfcOnTrack.Tekla/         # Tekla plugin (planned)
-├── build/                         # NUKE build scripts
-├── install/                       # Installer project
-├── output/                        # Build artifacts (gitignored)
-├── IfcOnTrackPlugins.sln
-└── Directory.Build.props          # Shared MSBuild properties
+│   └── dotnet/
+│       ├── IfcOnTrack.Core/      # Shared library (UI loader, bridge, update checker)
+│       └── IfcOnTrack.Revit/     # Revit plugin — zie README aldaar
+├── build/                        # ModularPipelines build systeem
+├── install/                      # WixSharp MSI installer
+├── output/                       # Build artifacts (gitignored)
+└── Directory.Build.props         # Gedeelde MSBuild properties
 ```
+
+## Versioning
+
+De plugin suite gebruikt **SemVer**: `MAJOR.MINOR.PATCH`
+
+Alle plugins delen hetzelfde versienummer. Een release aanmaken:
+
+```bash
+git tag v1.2.0
+git push origin v1.2.0
+```
+
+Dit triggert automatisch de release pipeline: compile → sign → GitHub Release.
+
+Zie [source/dotnet/IfcOnTrack.Revit/README.md](source/dotnet/IfcOnTrack.Revit/README.md) voor details over debug, build en de volledige CI/CD flow.
 
 ## Installation (End Users)
 
-1. Download the latest release from [Releases](https://github.com/on-track-nl/IFC.On-Track.nl-plugins/releases)
-2. Run `IfcOnTrack-Setup.exe`
-3. Select Revit versions to install
-4. Launch Revit - find IFC.On-Track in the Add-Ins ribbon
+1. Download de laatste release van [Releases](https://github.com/on-track-nl/IFC.On-Track.nl-plugins/releases)
+2. Voer de `.msi` installer uit
+3. Selecteer de Revit versies om te installeren
+4. Start Revit — vind IFC.On-Track in het Add-Ins ribbon
 
 ## Contributing
 
-Contributions are welcome! Please read our contributing guidelines and submit PRs.
-
 ### Branch Naming
 
-- `feat/` - New features
-- `fix/` - Bug fixes  
-- `refactor/` - Code improvements
+- `feat/` — nieuwe functionaliteit
+- `fix/` — bug fixes
+- `refactor/` — code verbeteringen
 
 ### Commit Format
 
@@ -111,10 +90,10 @@ fix(core): correct license validation timeout
 
 ## License
 
-MIT License - see [LICENSE](LICENSE)
+MIT License — zie [LICENSE](LICENSE)
 
 ## Related
 
-- [IFC.On-Track.nl](https://ifc.on-track.nl) - Web platform
-- [bSDD](https://www.buildingsmart.org/users/services/buildingsmart-data-dictionary/) - buildingSMART Data Dictionary
-- [IDS](https://github.com/buildingSMART/IDS) - Information Delivery Specification
+- [IFC.On-Track.nl](https://ifc.on-track.nl) — Web platform
+- [bSDD](https://www.buildingsmart.org/users/services/buildingsmart-data-dictionary/) — buildingSMART Data Dictionary
+- [IDS](https://github.com/buildingSMART/IDS) — Information Delivery Specification
