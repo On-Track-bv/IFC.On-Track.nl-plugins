@@ -115,9 +115,14 @@ $RECYCLE.BIN/
 .AppleDouble
 .LSOverride
 
-# UI assets (downloaded/embedded)
-ui/
-ui-embedded/
+# UI assets (downloaded/embedded) - exclude runtime/build UI asset folders
+# Note: use explicit paths to avoid matching C# source directories named UI/
+source/dotnet/**/ui/
+source/dotnet/**/ui-embedded/
+output/**/ui/
+output/**/ui-embedded/
+installer/**/ui/
+installer/**/ui-embedded/
 
 # Local development
 *.local
