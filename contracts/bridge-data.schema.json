@@ -39,7 +39,12 @@
         },
         "hasAssociations": {
           "type": ["array", "null"],
-          "items": { "$ref": "#/$defs/IfcClassificationReference" }
+          "items": {
+            "oneOf": [
+              { "$ref": "#/$defs/IfcClassificationReference" },
+              { "$ref": "#/$defs/IfcMaterial" }
+            ]
+          }
         }
       }
     },
@@ -78,6 +83,17 @@
         "identification": { "type": ["string", "null"] },
         "name":           { "type": ["string", "null"] },
         "referencedSource": { "$ref": "#/$defs/IfcClassification" }
+      },
+      "required": ["type"]
+    },
+
+    "IfcMaterial": {
+      "type": "object",
+      "description": "IFC Material, used for bSDD material linking",
+      "properties": {
+        "type": { "type": "string", "const": "IfcMaterial" },
+        "name": { "type": ["string", "null"] },
+        "description": { "type": ["string", "null"] }
       },
       "required": ["type"]
     },

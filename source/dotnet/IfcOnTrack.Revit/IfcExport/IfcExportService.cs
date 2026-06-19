@@ -1,40 +1,48 @@
 // Purpose: IFC export service – orchestrates bSDD-aware IFC export from Revit
-// Handles: UDPS property mapping file generation, IFC classification setup, export, post-processing
+// Handles: IFC export configuration (DataStorage-backed, user-editable), UDPS mapping, export, post-processing
 using System.IO;
 using Autodesk.Revit.DB;
+using Autodesk.Revit.DB.ExtensibleStorage;
+using BIM.IFC.Export.UI;
 using IfcOnTrack.Revit.Model;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 
 namespace IfcOnTrack.Revit.IfcExport;
 
 /// <summary>
 /// Orchestrates a complete bSDD-aware IFC export:
-/// 1. Stores temporary bSDD classifications in document DataStorage
-/// 2. Generates a UDPS (User Defined Property Sets) mapping file for bsdd/prop/ parameters
-/// 3. Triggers Revit's IFC export
-/// 4. Post-processes the output file to fix classification reference URLs
-/// 5. Restores the original document classifications
+/// 1. Loads (or creates) the "Bsdd export settings" IFCExportConfiguration from document DataStorage
+/// 2. Stores temporary bSDD classifications in document DataStorage
+/// 3. Merges bsdd/prop/ parameters into the UDPS mapping file from the stored configuration
+/// 4. Triggers Revit's IFC export via IFCExportConfiguration.UpdateOptions()
+/// 5. Post-processes the output file to fix classification reference URLs
+/// 6. Restores the original document classifications
 ///
-/// The IFC export uses Revit's standard IFCExportOptions.
-/// Advanced configuration (IFC version, coordinate base, etc.) is applied via IFCExportOptions.AddOption().
+/// The stored IFCExportConfiguration uses the same DataStorage schema GUID as the legacy
+/// bSDD-Revit-plugin so that documents carry their export settings across plugin versions.
+/// Users can modify the export profile through Revit's native IFC Export dialog.
 /// </summary>
 public class IfcExportService
 {
     private readonly ILogger<IfcExportService> _logger;
-    private readonly SettingsManager _settingsManager;
     private readonly ElementsManager _elementsManager;
     private readonly IfcClassificationManager _classificationManager;
     private readonly IfcPostprocessor _postprocessor;
 
+    // Same schema GUID as bSDD-Revit-plugin — keeps export settings when opening old documents.
+    private static readonly Guid ExportConfigSchemaGuid = new("c2a3e6fe-ce51-4f35-8ff1-20c34567b687");
+    private const string ExportConfigSchemaName = "IFCExportConfigurationMap";
+    private const string ExportConfigFieldName  = "MapField";
+    private const string BsddConfigurationName  = "Bsdd export settings";
+
     public IfcExportService(
         ILogger<IfcExportService> logger,
-        SettingsManager settingsManager,
         ElementsManager elementsManager,
         IfcClassificationManager classificationManager,
         IfcPostprocessor postprocessor)
     {
         _logger = logger;
-        _settingsManager = settingsManager;
         _elementsManager = elementsManager;
         _classificationManager = classificationManager;
         _postprocessor = postprocessor;
@@ -55,11 +63,16 @@ public class IfcExportService
         var allEntities = _elementsManager.GetAllElementTypesAsIfcJson(doc);
         _postprocessor.CollectFromEntities(allEntities);
 
+        // Load or create the bSDD IFC export configuration — always override ActiveViewId
+        var exportConfig = GetOrSetBsddConfiguration(doc);
+        exportConfig.ActiveViewId = activeViewId;
+        exportConfig.ActivePhaseId = -1;
+
         // Get save path
         var savePath = PromptForSavePath();
         if (string.IsNullOrEmpty(savePath)) return;
 
-        var folder = Path.GetDirectoryName(savePath)!;
+        var folder   = Path.GetDirectoryName(savePath)!;
         var fileName = Path.GetFileName(savePath);
 
         try
@@ -74,13 +87,22 @@ public class IfcExportService
                 tx.Commit();
             }
 
-            // 2. Build IFC export options
-            var options = BuildExportOptions(doc, activeViewId);
+            // 2. Merge bsdd/prop/ parameters into the UDPS file from the configuration
+            var udpsFile = BuildUdpsFile(doc, exportConfig.ExportUserDefinedPsetsFileName);
+            if (!string.IsNullOrEmpty(udpsFile))
+            {
+                exportConfig.ExportUserDefinedPsets = true;
+                exportConfig.ExportUserDefinedPsetsFileName = udpsFile;
+            }
 
-            // 3. Export to temp directory
-            var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
-            Directory.CreateDirectory(tempDir);
+            // 3. Build IFC export options from the (potentially user-modified) configuration
+            var options = new IFCExportOptions();
+            exportConfig.UpdateOptions(options, activeViewId);
+
+            // 4. Export to temp directory, then move to final path
+            var tempDir      = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
             var tempFilePath = Path.Combine(tempDir, fileName);
+            Directory.CreateDirectory(tempDir);
 
             using (var exportTx = new Transaction(doc, "IFC Export"))
             {
@@ -92,10 +114,9 @@ public class IfcExportService
             if (!File.Exists(tempFilePath))
                 throw new InvalidOperationException($"IFC export produced no file at {tempFilePath}");
 
-            // 4. Post-process (fix classification URLs)
+            // 5. Post-process (fix classification reference URLs)
             _postprocessor.PostProcess(tempFilePath, savePath);
 
-            // Cleanup temp dir
             if (Directory.Exists(tempDir))
                 Directory.Delete(tempDir, recursive: true);
 
@@ -103,7 +124,7 @@ public class IfcExportService
         }
         finally
         {
-            // 5. Restore original classifications
+            // 6. Restore original classifications
             try
             {
                 using var restoreTx = new Transaction(doc, "Restore IFC classifications");
@@ -118,36 +139,133 @@ public class IfcExportService
         }
     }
 
-    private IFCExportOptions BuildExportOptions(Document doc, ElementId activeViewId)
+    // ─── IFC Export Configuration (DataStorage) ───────────────────────────────
+
+    /// <summary>
+    /// Returns the stored "Bsdd export settings" IFCExportConfiguration, or creates and persists a default one.
+    /// Uses the same DataStorage schema as the legacy bSDD-Revit-plugin for document compatibility.
+    /// </summary>
+    public IFCExportConfiguration GetOrSetBsddConfiguration(Document doc)
     {
-        var options = new IFCExportOptions();
-
-        // IFC version – default to IFC4x3 (override via settings if needed)
-        options.AddOption("IFCVersion", "25"); // 25 = IFC4x3 in Revit's internal enum
-
-        // UDPS property mapping
-        var udpsFile = BuildUdpsFile(doc);
-        if (!string.IsNullOrEmpty(udpsFile))
+        var stored = FindStoredConfiguration(doc);
+        if (stored != null)
         {
-            options.AddOption("ExportUserDefinedPsets", "true");
-            options.AddOption("ExportUserDefinedPsetsFileName", udpsFile);
+            _logger.LogDebug("Loaded IFC export configuration '{Name}' from DataStorage", stored.Name);
+            return stored;
         }
 
-        // Export linked files: don't
-        options.AddOption("ExportLinkedFiles", "false");
+        var config = GetDefaultExportConfiguration();
 
-        // Use active view
-        if (activeViewId != ElementId.InvalidElementId)
-            options.FilterViewId = activeViewId;
+        using var tx = new Transaction(doc, "Create bSDD IFC export configuration");
+        tx.Start();
+        SaveConfigurationToDataStorage(doc, config);
+        tx.Commit();
 
-        return options;
+        _logger.LogInformation("Created default IFC export configuration '{Name}'", config.Name);
+        return config;
     }
+
+    private IFCExportConfiguration? FindStoredConfiguration(Document doc)
+    {
+        var schema = Schema.Lookup(ExportConfigSchemaGuid);
+        if (schema == null) return null;
+
+        var field = schema.GetField(ExportConfigFieldName);
+
+        foreach (var ds in new FilteredElementCollector(doc)
+            .OfClass(typeof(DataStorage))
+            .Cast<DataStorage>())
+        {
+            try
+            {
+                var entity = ds.GetEntity(schema);
+                if (!entity.IsValid()) continue;
+
+                var json = entity.Get<string>(field);
+                if (string.IsNullOrEmpty(json)) continue;
+
+                var config = JsonConvert.DeserializeObject<IFCExportConfiguration>(
+                    json, new IFCExportConfigurationConverter());
+                if (config?.Name == BsddConfigurationName)
+                    return config;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to deserialize IFC export configuration from DataStorage");
+            }
+        }
+
+        return null;
+    }
+
+    private void SaveConfigurationToDataStorage(Document doc, IFCExportConfiguration config)
+    {
+        var schema = GetOrCreateExportConfigSchema();
+        var dataStorage = DataStorage.Create(doc);
+        var entity = new Entity(schema);
+        entity.Set<string>(schema.GetField(ExportConfigFieldName), config.SerializeConfigToJson());
+        dataStorage.SetEntity(entity);
+    }
+
+    private static IFCExportConfiguration GetDefaultExportConfiguration()
+    {
+        var config = IFCExportConfiguration.CreateDefaultConfiguration();
+        config.Name                              = BsddConfigurationName;
+        config.IFCVersion                        = IFCVersion.IFC4x3;
+        config.ExchangeRequirement               = 0;
+        config.IFCFileType                       = 0;
+        config.SpaceBoundaries                   = 0;
+        config.SplitWallsAndColumns              = false;
+        config.VisibleElementsOfCurrentView      = true;
+        config.ExportRoomsInView                 = false;
+        config.IncludeSteelElements              = true;
+        config.Export2DElements                  = false;
+        config.ExportInternalRevitPropertySets   = false;
+        config.ExportIFCCommonPropertySets       = true;
+        config.ExportBaseQuantities              = true;
+        config.ExportSchedulesAsPsets            = false;
+        config.ExportSpecificSchedules           = false;
+        config.ExportUserDefinedPsets            = false;
+        config.ExportUserDefinedPsetsFileName    = string.Empty;
+        config.ExportUserDefinedParameterMapping = false;
+        config.ExportUserDefinedParameterMappingFileName = string.Empty;
+        config.TessellationLevelOfDetail         = 0.5;
+        config.ExportPartsAsBuildingElements     = false;
+        config.ExportSolidModelRep               = false;
+        config.UseActiveViewGeometry             = false;
+        config.UseFamilyAndTypeNameForReference  = false;
+        config.Use2DRoomBoundaryForVolume        = false;
+        config.IncludeSiteElevation              = false;
+        config.StoreIFCGUID                      = true;
+        config.ExportBoundingBox                 = false;
+        config.UseOnlyTriangulation              = false;
+        config.UseTypeNameOnlyForIfcType         = false;
+        config.UseVisibleRevitNameAsEntityName   = false;
+        config.ActivePhaseId                     = -1;
+        return config;
+    }
+
+    private static Schema GetOrCreateExportConfigSchema()
+    {
+        var existing = Schema.Lookup(ExportConfigSchemaGuid);
+        if (existing != null) return existing;
+
+        var builder = new SchemaBuilder(ExportConfigSchemaGuid);
+        builder.SetSchemaName(ExportConfigSchemaName);
+        builder.SetReadAccessLevel(AccessLevel.Public);
+        builder.SetWriteAccessLevel(AccessLevel.Public);
+        builder.AddSimpleField(ExportConfigFieldName, typeof(string));
+        return builder.Finish();
+    }
+
+    // ─── UDPS file ────────────────────────────────────────────────────────────
 
     /// <summary>
     /// Builds a temporary UDPS property-sets mapping file that maps bsdd/prop/ parameters
-    /// into IFC property sets for the export.
+    /// into IFC property sets for the export. If the stored configuration already has a user
+    /// UDPS file, the bSDD properties are appended to it.
     /// </summary>
-    private string? BuildUdpsFile(Document doc)
+    private string? BuildUdpsFile(Document doc, string? existingUdpsFilePath)
     {
         try
         {
@@ -155,10 +273,20 @@ public class IfcExportService
             if (!bsddParameters.Any()) return null;
 
             var paramsByPset = GroupByPropertySet(bsddParameters);
-            var content = BuildUdpsContent(paramsByPset);
+            var bsddContent  = BuildUdpsContent(paramsByPset);
 
             var tempFile = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".txt");
-            File.WriteAllText(tempFile, content);
+
+            if (!string.IsNullOrEmpty(existingUdpsFilePath) && File.Exists(existingUdpsFilePath))
+            {
+                File.Copy(existingUdpsFilePath, tempFile);
+                File.AppendAllText(tempFile, bsddContent);
+            }
+            else
+            {
+                File.WriteAllText(tempFile, bsddContent);
+            }
+
             return tempFile;
         }
         catch (Exception ex)
@@ -170,7 +298,7 @@ public class IfcExportService
 
     private IList<Parameter> GetAllBsddPropParameters(Document doc)
     {
-        var seen = new HashSet<string>();
+        var seen   = new HashSet<string>();
         var result = new List<Parameter>();
 
         // bsdd/prop/ parameters are always type parameters – no need to iterate instances
@@ -179,7 +307,9 @@ public class IfcExportService
             foreach (Parameter param in element.Parameters)
             {
                 var name = param.Definition?.Name;
-                if (!string.IsNullOrEmpty(name) && name.StartsWith("bsdd/prop/", StringComparison.Ordinal) && seen.Add(name))
+                if (!string.IsNullOrEmpty(name) &&
+                    name.StartsWith("bsdd/prop/", StringComparison.Ordinal) &&
+                    seen.Add(name))
                     result.Add(param);
             }
         }
@@ -205,7 +335,7 @@ public class IfcExportService
         var sb = new System.Text.StringBuilder();
         foreach (var kvp in paramsByPset)
         {
-            var psetName = kvp.Key;
+            var psetName   = kvp.Key;
             var parameters = kvp.Value;
             sb.AppendLine();
             sb.AppendLine("#");
@@ -218,8 +348,8 @@ public class IfcExportService
             foreach (var p in parameters)
             {
                 var paramParts = p.Definition!.Name.Split('/');
-                var propName = paramParts.Length >= 4 ? string.Join("/", paramParts.Skip(3)) : p.Definition.Name;
-                var dataType = GetIfcDataType(p);
+                var propName   = paramParts.Length >= 4 ? string.Join("/", paramParts.Skip(3)) : p.Definition.Name;
+                var dataType   = GetIfcDataType(p);
                 sb.AppendLine($"\t{propName}\t{dataType}\t{p.Definition.Name}");
             }
         }
@@ -230,8 +360,8 @@ public class IfcExportService
     {
         return p.StorageType switch
         {
-            StorageType.String => "Text",
-            StorageType.Double => "Real",
+            StorageType.String  => "Text",
+            StorageType.Double  => "Real",
             StorageType.Integer => p.Definition.GetDataType().TypeId == "autodesk.spec:spec.bool-1.0.0"
                 ? "Boolean"
                 : "Integer",
@@ -243,10 +373,10 @@ public class IfcExportService
     {
         var dlg = new Microsoft.Win32.SaveFileDialog
         {
-            Filter = "IFC Files (*.ifc)|*.ifc",
-            FilterIndex = 1,
+            Filter       = "IFC Files (*.ifc)|*.ifc",
+            FilterIndex  = 1,
             RestoreDirectory = true,
-            Title = "Export IFC with bSDD classifications"
+            Title        = "Export IFC with bSDD classifications"
         };
 
         return dlg.ShowDialog() == true ? dlg.FileName : null;

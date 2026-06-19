@@ -29,6 +29,7 @@ public class BsddSelectionView : UserControl
     private readonly SettingsManager _settingsManager;
     private System.Windows.Controls.Grid? _mainGrid;
     private System.Windows.Controls.Grid? _browserContainer;
+    private bool _updateNotificationShown;
 
     // Pending data: cached so they can be re-pushed after NavigationCompleted
     private List<IfcEntity>? _pendingEntities;
@@ -464,6 +465,8 @@ private async System.Threading.Tasks.Task PushSelectionToJsAsync(List<IfcEntity>
     /// </summary>
     public void ShowUpdateNotification(IfcOnTrack.Core.Update.UpdateInfo updateInfo)
     {
+        if (_updateNotificationShown) return;
+        _updateNotificationShown = true;
         try
         {
             Dispatcher.Invoke(() =>

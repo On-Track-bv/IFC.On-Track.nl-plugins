@@ -1,3 +1,4 @@
+// Purpose: Computes display scale for the current monitor so the embedded web UI can adjust its zoom level
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;

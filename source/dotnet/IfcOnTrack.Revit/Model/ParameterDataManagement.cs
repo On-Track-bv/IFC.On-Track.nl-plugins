@@ -174,6 +174,7 @@ public class ParameterDataManagement
                         _parametersManager.ExistingProjectParameter(doc, bsddParamName), isInstance));
                 }
 
+                // Instance parameter values are not sent by the UI — only set type-level values.
                 if (!isInstance)
                     parametersToSet[bsddParamName] = value;
             }

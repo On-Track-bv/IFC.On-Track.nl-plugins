@@ -237,7 +237,7 @@ public class ElementsManager
                 instanceTx.Commit();
             }
 
-            // 4. Set values
+            // 4. Set values on the element type (instance parameter values are not yet supported)
             using (var setTx = new Transaction(doc, "Set bSDD parameter values"))
             {
                 setTx.Start();
@@ -312,7 +312,11 @@ public class ElementsManager
             var schema = GetOrCreateSchema();
             var field = schema.GetField(SchemaFieldName);
             var entity = new Entity(schema);
-            entity.Set(field, JsonConvert.SerializeObject(associations ?? new List<Association>()));
+            // Serialize only IfcClassificationReference items — LoadAssociationsFromStorage
+            // deserializes as List<IfcClassificationReference>, so other subtypes would be lost anyway.
+            var classRefs = associations?.OfType<IfcClassificationReference>().ToList()
+                ?? new List<IfcClassificationReference>();
+            entity.Set(field, JsonConvert.SerializeObject(classRefs));
             elementType.SetEntity(entity);
         }
         catch (Exception ex)
@@ -393,7 +397,10 @@ public class ElementsManager
         List<IfcClassificationReference> stored,
         Dictionary<string, (string? Identification, string? Name)> fromSettings)
     {
-        var result = stored.ToDictionary(r => r.ReferencedSource?.Location ?? string.Empty, r => r);
+        // GroupBy first to handle items with null/empty Location without throwing on duplicate keys.
+        var result = stored
+            .GroupBy(r => r.ReferencedSource?.Location ?? string.Empty)
+            .ToDictionary(g => g.Key, g => g.First());
 
         foreach (var kvp in fromSettings)
         {

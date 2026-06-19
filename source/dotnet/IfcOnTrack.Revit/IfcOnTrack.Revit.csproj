@@ -61,6 +61,12 @@
         <PackageReference Include="JetBrains.Annotations" Version="2025.*" PrivateAssets="all" />
     </ItemGroup>
 
+    <!-- IFC Exporter addin API — compile-time only; DLLs provided at runtime by the Revit IFC Exporter addin -->
+    <ItemGroup>
+        <PackageReference Include="Revit_All_Main_Versions_IFC_x64" Version="2025.0.0"
+                          ExcludeAssets="runtime" PrivateAssets="all" />
+    </ItemGroup>
+
     <!-- Core reference -->
     <ItemGroup>
         <ProjectReference Include="..\IfcOnTrack.Core\IfcOnTrack.Core.csproj" />
