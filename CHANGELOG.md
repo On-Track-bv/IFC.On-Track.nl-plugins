@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2026-06-22
+
+### Fixed
+- **Critical:** MSI installer build now succeeds in CI/CD environments (fixed WixSharp wildcard issue with `Release.R25` paths)
+- **Critical:** `.addin` file now correctly placed at `Addins\2025\` level instead of inside `IfcOnTrack.Revit\` subfolder
+- Fixed duplicate WiX identifiers for nested runtime directories (win-arm64, win-x64, win-x86)
+- Fixed "filename syntax is incorrect" error when building installer with dot-separated configuration names
+
+### Technical
+- Replaced WixSharp `DirFiles` wildcards with explicit recursive file enumeration
+- Updated `Installer.Generator.cs` to generate unique IDs using full relative paths
+- All WiX identifiers now sanitized (replaced `.` and `-` with `_`)
+- Build system now fully operational for automated releases
+
 ## [1.0.1] - 2026-06-22
 
 ### Fixed
