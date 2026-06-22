@@ -97,6 +97,10 @@ InstallShield/
 .axoCover/*
 !.axoCover/settings.json
 
+# Claude AI assistant (contains local paths)
+.claude/
+*.claude.json
+
 # Coverlet
 coverage*.json
 coverage*.xml
