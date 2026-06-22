@@ -64,7 +64,10 @@ git push origin v1.2.0
 
 Dit triggert automatisch de release pipeline: compile → sign → GitHub Release.
 
-Zie [source/dotnet/IfcOnTrack.Revit/README.md](source/dotnet/IfcOnTrack.Revit/README.md) voor details over debug, build en de volledige CI/CD flow.
+**Belangrijke documentatie:**
+- [docs/AUTO_UPDATE_STRATEGY.md](docs/AUTO_UPDATE_STRATEGY.md) - Plugin release workflow en update mechanisme
+- [docs/UI_VERSIONING_STRATEGY.md](docs/UI_VERSIONING_STRATEGY.md) - UI versie compatibiliteit en update protocol
+- [source/dotnet/IfcOnTrack.Revit/README.md](source/dotnet/IfcOnTrack.Revit/README.md) - Revit plugin details, debug en CI/CD flow
 
 ## Installation (End Users)
 
