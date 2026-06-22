@@ -55,6 +55,7 @@ public class ElementsManager
     /// <summary>
     /// Get all ElementTypes in the document as IfcEntities.
     /// Includes Rooms and Area's as special entities.
+    /// No decomposition - all types are already present.
     /// </summary>
     public List<IfcEntity> GetAllElementTypesAsIfcJson(Document doc)
     {
@@ -63,55 +64,113 @@ public class ElementsManager
             .Cast<ElementType>()
             .ToList();
 
-        return BuildIfcEntityList(doc, elementTypes);
+        return BuildIfcEntityList(doc, elementTypes, decomposeComposites: false);
     }
 
     /// <summary>
     /// Get ElementTypes whose instances are visible in the given view.
+    /// Decomposes stacked walls and groups to their component types.
     /// </summary>
     public List<IfcEntity> GetViewElementTypesAsIfcJson(Document doc, View view)
     {
-        var typeIds = new FilteredElementCollector(doc, view.Id)
+        var instances = new FilteredElementCollector(doc, view.Id)
             .WhereElementIsNotElementType()
-            .Select(e => e.GetTypeId())
-            .Where(id => id != ElementId.InvalidElementId)
-            .Distinct()
             .ToList();
 
-        var elementTypes = typeIds
-            .Select(id => doc.GetElement(id) as ElementType)
-            .Where(t => t != null)
-            .Cast<ElementType>()
-            .ToList();
-
-        return BuildIfcEntityList(doc, elementTypes);
+        var elementTypes = GetTypesFromInstances(doc, instances, decomposeComposites: true);
+        return BuildIfcEntityList(doc, elementTypes, decomposeComposites: false);
     }
 
     /// <summary>
     /// Get element types from a set of selected element IDs.
+    /// Decomposes stacked walls and groups to their component types.
     /// </summary>
     public List<IfcEntity> GetSelectedElementsAsIfcJson(Document doc, ICollection<ElementId> selectedIds)
     {
-        var typeIds = selectedIds
+        var instances = selectedIds
             .Select(id => doc.GetElement(id))
             .Where(e => e != null)
-            .Select(e => e!.GetTypeId())
-            .Where(id => id != ElementId.InvalidElementId)
-            .Distinct()
+            .Cast<Element>()
             .ToList();
 
-        var elementTypes = typeIds
-            .Select(id => doc.GetElement(id) as ElementType)
-            .Where(t => t != null)
-            .Cast<ElementType>()
-            .ToList();
-
-        return BuildIfcEntityList(doc, elementTypes);
+        var elementTypes = GetTypesFromInstances(doc, instances, decomposeComposites: true);
+        return BuildIfcEntityList(doc, elementTypes, decomposeComposites: false);
     }
 
-    private List<IfcEntity> BuildIfcEntityList(Document doc, List<ElementType> elementTypes)
+    /// <summary>
+    /// Extracts ElementTypes from instances, optionally decomposing stacked walls and groups.
+    /// </summary>
+    private List<ElementType> GetTypesFromInstances(Document doc, List<Element> instances, bool decomposeComposites)
     {
-        var entities = elementTypes.Select(et => CreateIfcEntity(et, doc)).ToList();
+        var result = new HashSet<ElementType>();
+
+        foreach (var instance in instances)
+        {
+            if (instance == null) continue;
+
+            // Check if this is a stacked wall instance
+            if (decomposeComposites && instance is Wall wall && wall.IsStackedWall)
+            {
+                var memberIds = wall.GetStackedWallMemberIds();
+                foreach (var memberId in memberIds)
+                {
+                    if (doc.GetElement(memberId) is Wall memberWall)
+                    {
+                        var memberType = doc.GetElement(memberWall.GetTypeId()) as ElementType;
+                        if (memberType != null)
+                            result.Add(memberType);
+                    }
+                }
+            }
+            // Check if this is a group instance
+            else if (decomposeComposites && instance is Group group)
+            {
+                var memberIds = group.GetMemberIds();
+                foreach (var memberId in memberIds)
+                {
+                    var member = doc.GetElement(memberId);
+                    if (member != null)
+                    {
+                        var typeId = member.GetTypeId();
+                        if (typeId != ElementId.InvalidElementId)
+                        {
+                            var memberType = doc.GetElement(typeId) as ElementType;
+                            if (memberType != null)
+                                result.Add(memberType);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // Regular instance - just get its type
+                var typeId = instance.GetTypeId();
+                if (typeId != ElementId.InvalidElementId)
+                {
+                    var elementType = doc.GetElement(typeId) as ElementType;
+                    if (elementType != null)
+                        result.Add(elementType);
+                }
+            }
+        }
+
+        return result.ToList();
+    }
+
+    private List<IfcEntity> BuildIfcEntityList(Document doc, List<ElementType> elementTypes, bool decomposeComposites)
+    {
+        // Filter unwanted categories and remove duplicates
+        var filteredTypes = elementTypes
+            .Where(et => et?.Category != null && !ShouldFilterCategory(et.Category.Name))
+            .ToList();
+
+        var processedTypes = filteredTypes
+            .GroupBy(et => et.Id.ToString())
+            .Select(g => g.First())
+            .ToList();
+
+        // Create IfcEntities
+        var entities = processedTypes.Select(et => CreateIfcEntity(et, doc)).ToList();
 
         // Add special Room and Area entities (matching bSDD-Revit-plugin behaviour)
         entities.Add(new IfcEntity
@@ -132,6 +191,29 @@ public class ElementsManager
         });
 
         return entities;
+    }
+
+    /// <summary>
+    /// Checks if a category should be filtered out from the element list.
+    /// Excludes: Levels, Grids, Location Data, RVT Links, .dwg, .pdf files.
+    /// </summary>
+    private static bool ShouldFilterCategory(string categoryName)
+    {
+        if (string.IsNullOrEmpty(categoryName)) return true;
+
+        // Exact matches to filter out
+        if (categoryName is "Levels" or "Grids" or "Location Data" or "RVT Links")
+            return true;
+
+        // Filter out import categories (.dwg, .pdf)
+        if (categoryName.Length >= 4)
+        {
+            var extension = categoryName.Substring(categoryName.Length - 4);
+            if (extension == ".dwg" || extension == ".pdf")
+                return true;
+        }
+
+        return false;
     }
 
     // ─── Write: IFC JSON → Revit ──────────────────────────────────────────────
@@ -237,7 +319,7 @@ public class ElementsManager
                 instanceTx.Commit();
             }
 
-            // 4. Set values
+            // 4. Set values on the element type (instance parameter values are not yet supported)
             using (var setTx = new Transaction(doc, "Set bSDD parameter values"))
             {
                 setTx.Start();
@@ -312,7 +394,11 @@ public class ElementsManager
             var schema = GetOrCreateSchema();
             var field = schema.GetField(SchemaFieldName);
             var entity = new Entity(schema);
-            entity.Set(field, JsonConvert.SerializeObject(associations ?? new List<Association>()));
+            // Serialize only IfcClassificationReference items — LoadAssociationsFromStorage
+            // deserializes as List<IfcClassificationReference>, so other subtypes would be lost anyway.
+            var classRefs = associations?.OfType<IfcClassificationReference>().ToList()
+                ?? new List<IfcClassificationReference>();
+            entity.Set(field, JsonConvert.SerializeObject(classRefs));
             elementType.SetEntity(entity);
         }
         catch (Exception ex)
@@ -393,7 +479,10 @@ public class ElementsManager
         List<IfcClassificationReference> stored,
         Dictionary<string, (string? Identification, string? Name)> fromSettings)
     {
-        var result = stored.ToDictionary(r => r.ReferencedSource?.Location ?? string.Empty, r => r);
+        // GroupBy first to handle items with null/empty Location without throwing on duplicate keys.
+        var result = stored
+            .GroupBy(r => r.ReferencedSource?.Location ?? string.Empty)
+            .ToDictionary(g => g.Key, g => g.First());
 
         foreach (var kvp in fromSettings)
         {

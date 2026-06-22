@@ -92,11 +92,12 @@ public class ParameterDataManagement
             if (isRoomOrArea)
             {
                 // Rooms/areas use instance parameters with [Instance] suffix
+                // Instance parameters are created but values are NOT set (plugin is type-level only)
                 var instanceName = bsddParamName + "[Instance]";
                 parametersToCreate.Add(new ParameterCreation(
                     instanceName, specType,
                     _parametersManager.ExistingProjectParameter(doc, instanceName), true));
-                parametersToSet[instanceName] = $"{classRef.Identification}:{classRef.Name}";
+                // DO NOT SET VALUE: parametersToSet[instanceName] = ... (user fills instance values manually)
             }
             else
             {
@@ -174,6 +175,7 @@ public class ParameterDataManagement
                         _parametersManager.ExistingProjectParameter(doc, bsddParamName), isInstance));
                 }
 
+                // Instance parameter values are not sent by the UI — only set type-level values.
                 if (!isInstance)
                     parametersToSet[bsddParamName] = value;
             }
@@ -369,9 +371,16 @@ public class ParameterDataManagement
                     if (!result.ContainsKey(shortName))
                         result[shortName] = isInstance;
                 }
+                else if (name.StartsWith("bsdd/class/", StringComparison.Ordinal))
+                {
+                    // bSDD classification – type parameter unless it ends with [Instance] (for Rooms/Areas)
+                    bool isClassInstance = name.EndsWith("[Instance]", StringComparison.Ordinal);
+                    if (!result.ContainsKey(name))
+                        result[name] = isClassInstance;
+                }
             }
 
-            // Fixed entry matching original plugin behaviour
+            // Disable name to be editable in UI (matching original plugin behaviour)
             result["Attributes/Name"] = true;
         }
         catch (Exception ex)
