@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-06-22
+
+### Fixed
+- **Critical:** Installer now includes `.addin` manifest file (plugin was invisible to Revit in v1.0.0)
+- **Critical:** Files now installed in correct subfolder structure (`Addins\2026\IfcOnTrack.Revit\`)
+- Plugin now correctly appears in Revit Add-Ins ribbon
+
+### Technical
+- Updated `IfcOnTrack.Revit.csproj` to copy `.addin` to build output
+- Updated `Installer.Generator.cs` to create proper folder structure with subdirectories
+
 ## [1.0.0] - 2026-06-22
 
 ### Added
@@ -50,4 +61,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - UI Version: bSDD-filter-UI v1.9
 - License: MIT
 
+[1.0.1]: https://github.com/On-Track-bv/IFC.On-Track.nl-plugins/releases/tag/v1.0.1
 [1.0.0]: https://github.com/On-Track-bv/IFC.On-Track.nl-plugins/releases/tag/v1.0.0
