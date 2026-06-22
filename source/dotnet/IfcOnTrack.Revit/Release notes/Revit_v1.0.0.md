@@ -6,8 +6,10 @@ We're excited to announce the first stable release of the IFC.On-Track.nl deskto
 
 ## 📦 What's Included
 
-- **Revit 2025** plugin (IfcOnTrack.Revit-R25-v1.0.0.msi)
-- **Revit 2026** plugin (IfcOnTrack.Revit-R26-v1.0.0.msi)
+- **IfcOnTrack.Revit-v1.0.0-SingleUser.msi** - Installs to user profile (no admin rights needed)
+- **IfcOnTrack.Revit-v1.0.0-MultiUser.msi** - Installs system-wide (requires admin)
+
+Both installers support **Revit 2025 and 2026** with feature selection during installation.
 
 ## ✨ Key Features
 
@@ -58,15 +60,21 @@ We're excited to announce the first stable release of the IFC.On-Track.nl deskto
 
 ### Install Steps
 
-1. **Download** the MSI installer for your Revit version:
-   - `IfcOnTrack.Revit-R25-v1.0.0.msi` (Revit 2025)
-   - `IfcOnTrack.Revit-R26-v1.0.0.msi` (Revit 2026)
+1. **Download** the installer:
+   - **SingleUser** (recommended): No admin rights needed, installs to `%AppData%\Autodesk\Revit\Addins\`
+   - **MultiUser**: Requires admin, installs to `%ProgramData%\Autodesk\Revit\Addins\`
 
-2. **Run the installer** - Follow the setup wizard
+2. **Run the installer** and follow the setup wizard
 
-3. **Start Revit** - Find "IFC.On-Track.nl" in the **Add-Ins** ribbon tab
+3. **Select Revit versions** - Check the boxes for the Revit versions you have installed:
+   - ☑ Revit 2025
+   - ☑ Revit 2026
 
-4. **Configure** - Click "bSDD selection" to open the dockable panel and configure your dictionaries in Settings
+4. **Complete installation** - Click Install
+
+5. **Start Revit** - Find "IFC.On-Track.nl" in the **Add-Ins** ribbon tab
+
+6. **Configure** - Click "bSDD selection" to open the dockable panel and configure your dictionaries in Settings
 
 ### First Launch
 

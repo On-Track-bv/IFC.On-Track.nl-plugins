@@ -24,9 +24,10 @@ git push --tags
 ```
 
 De CI/CD pipeline (.github/workflows/ci.yml) bouwt automatisch:
-- `IfcOnTrack.Revit-R25-v1.0.0.exe` installer voor Revit 2025
-- `IfcOnTrack.Revit-R26-v1.0.0.exe` installer voor Revit 2026
-- Release notes uit `CHANGELOG.md`
+- `IfcOnTrack.Revit-v1.0.0-SingleUser.msi` - User install (no admin)
+- `IfcOnTrack.Revit-v1.0.0-MultiUser.msi` - System install (admin required)
+
+Both installers include support for Revit 2025 and 2026 with feature selection.
 
 ### 2. Versie Beheer
 
@@ -42,8 +43,8 @@ Voeg dit JavaScript toe aan je website om de laatste versie te tonen:
 ```html
 <div id="download-section">
   <h2>Download IFC.On-Track.nl voor Revit</h2>
-  <div id="revit-2025"></div>
-  <div id="revit-2026"></div>
+  <div id="single-user"></div>
+  <div id="multi-user"></div>
 </div>
 
 <script>
@@ -54,21 +55,23 @@ fetch('https://api.github.com/repos/On-Track-bv/IFC.On-Track.nl-plugins/releases
     const assets = data.assets;
 
     // Find installers
-    const r25 = assets.find(a => a.name.includes('R25'));
-    const r26 = assets.find(a => a.name.includes('R26'));
+    const singleUser = assets.find(a => a.name.includes('SingleUser'));
+    const multiUser = assets.find(a => a.name.includes('MultiUser'));
 
     // Display download buttons
-    if (r25) {
-      document.getElementById('revit-2025').innerHTML = 
-        `<a href="${r25.browser_download_url}" class="download-btn">
-           Revit 2025 (${version})
+    if (singleUser) {
+      document.getElementById('single-user').innerHTML = 
+        `<a href="${singleUser.browser_download_url}" class="download-btn">
+           Download (User Install - Recommended) ${version}
+           <small>Revit 2025 & 2026 - No admin rights needed</small>
          </a>`;
     }
 
-    if (r26) {
-      document.getElementById('revit-2026').innerHTML = 
-        `<a href="${r26.browser_download_url}" class="download-btn">
-           Revit 2026 (${version})
+    if (multiUser) {
+      document.getElementById('multi-user').innerHTML = 
+        `<a href="${multiUser.browser_download_url}" class="download-btn">
+           Download (System Install) ${version}
+           <small>Revit 2025 & 2026 - Requires admin</small>
          </a>`;
     }
   });
@@ -153,11 +156,11 @@ git push origin v1.1.0
 
 ### 4. Test Release
 ```bash
-# Download installer
-curl -L -o installer.exe https://github.com/On-Track-bv/IFC.On-Track.nl-plugins/releases/latest/download/IfcOnTrack.Revit-R25-v1.1.0.exe
+# Download installer (user install)
+curl -L -o installer.msi https://github.com/On-Track-bv/IFC.On-Track.nl-plugins/releases/latest/download/IfcOnTrack.Revit-v1.1.0-SingleUser.msi
 
-# Test installatie
-./installer.exe
+# Test installation with feature selection
+msiexec /i installer.msi /qn ADDLOCAL=2025,2026
 
 # Start Revit en test plugin
 ```
