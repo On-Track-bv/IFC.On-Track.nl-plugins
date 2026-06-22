@@ -39,29 +39,43 @@ public static partial class Generator
 
             revitFeature.Add(feature);
 
-            // Create Files with unique ID prefix to avoid duplicates across versions
-            // Wrap in a subfolder to match Revit's expected structure: Addins\2025\IfcOnTrack.Revit\
+            // Create Revit addon structure:
+            // - .addin file at Addins\2025\ level
+            // - All other files in Addins\2025\IfcOnTrack.Revit\ subfolder
+            var versionEntities = new List<WixEntity>();
+
+            // Add .addin file to version root (Addins\2025\)
+            var addinFile = Directory.GetFiles(directory, "*.addin").FirstOrDefault();
+            if (addinFile != null)
+            {
+                versionEntities.Add(new WixSharp.File(feature, addinFile));
+            }
+
+            // Add all other files to IfcOnTrack.Revit subfolder
+            var pluginFolderEntities = new List<WixEntity>();
+            var rootFiles = Directory.GetFiles(directory).Where(f => !f.EndsWith(".addin", StringComparison.OrdinalIgnoreCase));
+            foreach (var file in rootFiles)
+            {
+                pluginFolderEntities.Add(new WixSharp.File(feature, file));
+            }
+
+            // Recursively add subdirectories to IfcOnTrack.Revit subfolder
+            pluginFolderEntities.AddRange(BuildDirectoryStructure(directory, directory, fileVersion, feature));
+
             var pluginFolder = new Dir(
                 new Id($"PluginFolder_{fileVersion}"),
                 "IfcOnTrack.Revit",
-                new Files(feature, $@"{directory}\*.*")
-                {
-                    Id = new Id($"Files_{fileVersion}")
-                },
-                // Include subdirectories (publish, runtimes, UI, etc.)
-                new DirFiles(feature, $@"{directory}\*\*.*")
-                {
-                    Id = new Id($"SubdirFiles_{fileVersion}")
-                }
+                pluginFolderEntities.ToArray()
             );
+            versionEntities.Add(pluginFolder);
 
             if (versionStorages.TryGetValue(fileVersion, out var storage))
             {
-                storage.Add(pluginFolder);
+                storage.AddRange(versionEntities);
             }
             else
             {
-                versionStorages.Add(fileVersion, [pluginFolder]);
+                versionStorages.Add(fileVersion, versionEntities);
             }
 
             LogFeatureFiles(directory, fileVersion);
@@ -71,6 +85,50 @@ public static partial class Generator
             .Select(storage => new Dir(new Id($"INSTALL{storage.Key}"), storage.Key, storage.Value.ToArray()))
             .Cast<WixEntity>()
             .ToArray();
+    }
+
+    /// <summary>
+    ///     Recursively build directory structure for WixSharp without using wildcards.
+    ///     This avoids issues with dots in directory names like "Release.R25".
+    /// </summary>
+    private static List<WixEntity> BuildDirectoryStructure(string rootBaseDirectory, string currentDirectory, string fileVersion, Feature feature)
+    {
+        var entities = new List<WixEntity>();
+        var subdirectories = Directory.GetDirectories(currentDirectory);
+
+        foreach (var subdirectory in subdirectories)
+        {
+            var subdirName = Path.GetFileName(subdirectory);
+            var subdirEntities = new List<WixEntity>();
+
+            // Add files in this subdirectory individually
+            var files = Directory.GetFiles(subdirectory);
+            foreach (var file in files)
+            {
+                subdirEntities.Add(new WixSharp.File(feature, file));
+            }
+
+            // Recursively add nested subdirectories
+            subdirEntities.AddRange(BuildDirectoryStructure(rootBaseDirectory, subdirectory, fileVersion, feature));
+
+            // Create directory entity if it has any content
+            if (subdirEntities.Count > 0)
+            {
+                // Create safe ID using full relative path from root to ensure uniqueness
+                var relativePath = Path.GetRelativePath(rootBaseDirectory, subdirectory);
+                var safeId = relativePath
+                    .Replace("\\", "_")
+                    .Replace(".", "_")
+                    .Replace("-", "_");
+                entities.Add(new Dir(
+                    new Id($"Dir_{fileVersion}_{safeId}"),
+                    subdirName,
+                    subdirEntities.ToArray()
+                ));
+            }
+        }
+
+        return entities;
     }
 
     /// <summary>
