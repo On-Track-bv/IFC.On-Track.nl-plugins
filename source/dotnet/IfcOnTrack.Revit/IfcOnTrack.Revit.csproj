@@ -93,4 +93,11 @@
         </None>
     </ItemGroup>
 
+    <!-- Copy .addin manifest to output directory for installer -->
+    <ItemGroup>
+        <None Include="IfcOnTrack.Revit.addin">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+
 </Project>

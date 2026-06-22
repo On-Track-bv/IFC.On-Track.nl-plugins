@@ -40,19 +40,28 @@ public static partial class Generator
             revitFeature.Add(feature);
 
             // Create Files with unique ID prefix to avoid duplicates across versions
-            var files = new Files(feature, $@"{directory}\*.*")
-            {
-                // Force unique component IDs by including version in the ID
-                Id = new Id($"Files_{fileVersion}")
-            };
+            // Wrap in a subfolder to match Revit's expected structure: Addins\2025\IfcOnTrack.Revit\
+            var pluginFolder = new Dir(
+                new Id($"PluginFolder_{fileVersion}"),
+                "IfcOnTrack.Revit",
+                new Files(feature, $@"{directory}\*.*")
+                {
+                    Id = new Id($"Files_{fileVersion}")
+                },
+                // Include subdirectories (publish, runtimes, UI, etc.)
+                new DirFiles(feature, $@"{directory}\*\*.*")
+                {
+                    Id = new Id($"SubdirFiles_{fileVersion}")
+                }
+            );
 
             if (versionStorages.TryGetValue(fileVersion, out var storage))
             {
-                storage.Add(files);
+                storage.Add(pluginFolder);
             }
             else
             {
-                versionStorages.Add(fileVersion, [files]);
+                versionStorages.Add(fileVersion, [pluginFolder]);
             }
 
             LogFeatureFiles(directory, fileVersion);
