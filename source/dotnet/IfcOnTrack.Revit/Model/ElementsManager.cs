@@ -276,22 +276,39 @@ public class ElementsManager
         {
             if (groupType is GroupType grpType)
             {
-                var memberIds = grpType.GetMemberIds();
-                foreach (var memberId in memberIds)
+                // Get all group instances of this type
+                var groupInstances = new FilteredElementCollector(doc)
+                    .OfClass(typeof(Group))
+                    .Cast<Group>()
+                    .Where(g => g.GetTypeId() == grpType.Id)
+                    .ToList();
+
+                // Get member types from instances
+                foreach (var group in groupInstances)
                 {
-                    var member = doc.GetElement(memberId);
-                    if (member != null)
+                    var memberIds = group.GetMemberIds();
+                    foreach (var memberId in memberIds)
                     {
-                        var typeId = member.GetTypeId();
-                        if (typeId != ElementId.InvalidElementId)
+                        var member = doc.GetElement(memberId);
+                        if (member != null)
                         {
-                            var memberType = doc.GetElement(typeId) as ElementType;
-                            if (memberType != null && !result.Any(t => t.Id == memberType.Id))
+                            var typeId = member.GetTypeId();
+                            if (typeId != ElementId.InvalidElementId)
                             {
-                                result.Add(memberType);
+                                var memberType = doc.GetElement(typeId) as ElementType;
+                                if (memberType != null && !result.Any(t => t.Id == memberType.Id))
+                                {
+                                    result.Add(memberType);
+                                }
                             }
                         }
                     }
+                }
+
+                // If no instances found, log warning
+                if (result.Count == 0)
+                {
+                    _logger.LogWarning("Model group type '{Name}' has no instances to decompose", grpType.Name);
                 }
             }
         }

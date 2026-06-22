@@ -371,9 +371,16 @@ public class ParameterDataManagement
                     if (!result.ContainsKey(shortName))
                         result[shortName] = isInstance;
                 }
+                else if (name.StartsWith("bsdd/class/", StringComparison.Ordinal))
+                {
+                    // bSDD classification – type parameter unless it ends with [Instance] (for Rooms/Areas)
+                    bool isClassInstance = name.EndsWith("[Instance]", StringComparison.Ordinal);
+                    if (!result.ContainsKey(name))
+                        result[name] = isClassInstance;
+                }
             }
 
-            // Fixed entry matching original plugin behaviour
+            // Disable name to be editable in UI (matching original plugin behaviour)
             result["Attributes/Name"] = true;
         }
         catch (Exception ex)
