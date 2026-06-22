@@ -92,11 +92,12 @@ public class ParameterDataManagement
             if (isRoomOrArea)
             {
                 // Rooms/areas use instance parameters with [Instance] suffix
+                // Instance parameters are created but values are NOT set (plugin is type-level only)
                 var instanceName = bsddParamName + "[Instance]";
                 parametersToCreate.Add(new ParameterCreation(
                     instanceName, specType,
                     _parametersManager.ExistingProjectParameter(doc, instanceName), true));
-                parametersToSet[instanceName] = $"{classRef.Identification}:{classRef.Name}";
+                // DO NOT SET VALUE: parametersToSet[instanceName] = ... (user fills instance values manually)
             }
             else
             {

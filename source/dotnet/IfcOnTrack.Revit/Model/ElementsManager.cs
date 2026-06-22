@@ -111,7 +111,17 @@ public class ElementsManager
 
     private List<IfcEntity> BuildIfcEntityList(Document doc, List<ElementType> elementTypes)
     {
-        var entities = elementTypes.Select(et => CreateIfcEntity(et, doc)).ToList();
+        // 1. Expand stacked walls and groups to their component types
+        var expandedTypes = ExpandCompositesAndFilter(doc, elementTypes);
+
+        // 2. Remove duplicates by ElementId
+        var uniqueTypes = expandedTypes
+            .GroupBy(et => et.Id.ToString())
+            .Select(g => g.First())
+            .ToList();
+
+        // 3. Create IfcEntities
+        var entities = uniqueTypes.Select(et => CreateIfcEntity(et, doc)).ToList();
 
         // Add special Room and Area entities (matching bSDD-Revit-plugin behaviour)
         entities.Add(new IfcEntity
@@ -132,6 +142,165 @@ public class ElementsManager
         });
 
         return entities;
+    }
+
+    /// <summary>
+    /// Expands composite elements (stacked walls, groups) to their component types and filters out unwanted categories.
+    /// Matching the old plugin's ListFilter behaviour plus stacked wall/group decomposition.
+    /// </summary>
+    private List<ElementType> ExpandCompositesAndFilter(Document doc, List<ElementType> elementTypes)
+    {
+        var result = new List<ElementType>();
+
+        foreach (var elementType in elementTypes)
+        {
+            // Skip null elements or elements without category
+            if (elementType?.Category == null) continue;
+
+            var categoryName = elementType.Category.Name;
+
+            // Filter out unwanted categories (matching old plugin ListFilter)
+            if (ShouldFilterCategory(categoryName)) continue;
+
+            // Handle stacked walls - decompose to individual wall types
+            if (categoryName == "Stacked Walls")
+            {
+                var expandedWallTypes = ExpandStackedWall(doc, elementType);
+                result.AddRange(expandedWallTypes);
+                continue;
+            }
+
+            // Handle model groups - decompose to types of contained elements
+            if (categoryName == "Model Groups")
+            {
+                var expandedGroupTypes = ExpandModelGroup(doc, elementType);
+                result.AddRange(expandedGroupTypes);
+                continue;
+            }
+
+            // Regular element type - add directly
+            result.Add(elementType);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Checks if a category should be filtered out from the element list.
+    /// Excludes: Levels, Grids, Location Data, RVT Links, .dwg, .pdf files.
+    /// Note: "Stacked Walls" and "Model Groups" are handled separately (decomposed).
+    /// </summary>
+    private static bool ShouldFilterCategory(string categoryName)
+    {
+        if (string.IsNullOrEmpty(categoryName)) return true;
+
+        // Exact matches to filter out
+        if (categoryName is "Levels" or "Grids" or "Location Data" or "RVT Links")
+            return true;
+
+        // Filter out import categories (.dwg, .pdf)
+        if (categoryName.Length >= 4)
+        {
+            var extension = categoryName.Substring(categoryName.Length - 4);
+            if (extension == ".dwg" || extension == ".pdf")
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Expands a stacked wall type to its component wall types.
+    /// </summary>
+    private List<ElementType> ExpandStackedWall(Document doc, ElementType stackedWallType)
+    {
+        var result = new List<ElementType>();
+
+        try
+        {
+            // Get the compound structure of the stacked wall
+            if (stackedWallType is WallType wallType && wallType.Kind == WallKind.Stacked)
+            {
+                // Collect all wall instances of this stacked wall type
+                var stackedWallInstances = new FilteredElementCollector(doc)
+                    .OfClass(typeof(Wall))
+                    .Cast<Wall>()
+                    .Where(w => w.WallType?.Id == stackedWallType.Id)
+                    .ToList();
+
+                // Get component wall types from instances
+                foreach (var wall in stackedWallInstances)
+                {
+                    if (wall.IsStackedWall)
+                    {
+                        var memberIds = wall.GetStackedWallMemberIds();
+                        foreach (var memberId in memberIds)
+                        {
+                            if (doc.GetElement(memberId) is Wall memberWall)
+                            {
+                                var memberType = doc.GetElement(memberWall.GetTypeId()) as ElementType;
+                                if (memberType != null && !result.Any(t => t.Id == memberType.Id))
+                                {
+                                    result.Add(memberType);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // If no instances found, try getting from type definition
+                if (result.Count == 0)
+                {
+                    // Note: WallType doesn't expose member types directly in API
+                    // This approach requires instances to exist
+                    _logger.LogWarning("Stacked wall type '{Name}' has no instances to decompose", stackedWallType.Name);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to expand stacked wall '{Name}'", stackedWallType.Name);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Expands a model group type to the types of all elements it contains.
+    /// </summary>
+    private List<ElementType> ExpandModelGroup(Document doc, ElementType groupType)
+    {
+        var result = new List<ElementType>();
+
+        try
+        {
+            if (groupType is GroupType grpType)
+            {
+                var memberIds = grpType.GetMemberIds();
+                foreach (var memberId in memberIds)
+                {
+                    var member = doc.GetElement(memberId);
+                    if (member != null)
+                    {
+                        var typeId = member.GetTypeId();
+                        if (typeId != ElementId.InvalidElementId)
+                        {
+                            var memberType = doc.GetElement(typeId) as ElementType;
+                            if (memberType != null && !result.Any(t => t.Id == memberType.Id))
+                            {
+                                result.Add(memberType);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to expand model group '{Name}'", groupType.Name);
+        }
+
+        return result;
     }
 
     // ─── Write: IFC JSON → Revit ──────────────────────────────────────────────
