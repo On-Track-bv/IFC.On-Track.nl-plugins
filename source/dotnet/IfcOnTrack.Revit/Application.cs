@@ -144,12 +144,12 @@ public class Application : ExternalApplication
         // bSDD selection first — primary workflow
         panel.AddPushButton<ShowBsddPanelCommand>("bSDD\nselection")
             .SetImage("/IfcOnTrack.Revit;component/Resources/Icons/BsddIcon16.png")
-            .SetLargeImage("/IfcOnTrack.Revit;component/Resources/Icons/BsddIcon32.png")
+            .SetLargeImage("/IfcOnTrack.Revit;component/Resources/Icons/BsddIcon96.png")
             .SetToolTip("Show/hide bSDD selection panel");
 
         panel.AddPushButton<IfcExportCommand>("IFC\nexport")
             .SetImage("/IfcOnTrack.Revit;component/Resources/Icons/IfcExportIcon16.png")
-            .SetLargeImage("/IfcOnTrack.Revit;component/Resources/Icons/IfcExportIcon32.png")
+            .SetLargeImage("/IfcOnTrack.Revit;component/Resources/Icons/IfcExportIcon96.png")
             .SetToolTip("Export to IFC using bSDD settings");
     }
 
