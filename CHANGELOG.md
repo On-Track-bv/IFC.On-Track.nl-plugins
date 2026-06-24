@@ -5,11 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.3] - 2026-06-24
 
 ### Changed
 - Ribbon tab renamed to "bSDD" (matches original bSDD Revit plugin — familiar for migrating users)
 - bSDD selection and IFC export icons restored to original bSDD plugin icons
+- Added 96×96 HiDPI icons for crisp display on 4K/high-DPI monitors
+- Installer product name changed to "IFC On-Track bSDD plugin"
+- Addin assembly path uses backslash for correct Windows path resolution
+
+### Fixed
+- Nullable warning suppression in `BsddSearchBridge` and `BsddSelectionView` replaced with proper guards
+- `Installer` project now correctly builds as Release in Release solution configurations
+- `build.sh` temp directory aligned with `build.ps1` (`.build/temp`)
 
 ## [1.0.2] - 2026-06-22
 
