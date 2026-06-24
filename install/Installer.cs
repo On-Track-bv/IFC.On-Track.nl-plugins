@@ -5,7 +5,7 @@ using WixSharp.CommonTasks;
 using WixSharp.Controls;
 
 const string outputName = "IfcOnTrack.Revit";
-const string projectName = "IFC.On-Track.nl";
+const string projectName = "IFC On-Track bSDD plugin";
 
 var version = args.Length > 0 ? args[0] : "1.0.0";
 var binDirectories = args.Length > 1 ? args[1..] : [];

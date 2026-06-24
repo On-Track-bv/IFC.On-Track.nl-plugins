@@ -471,14 +471,16 @@ private async System.Threading.Tasks.Task PushSelectionToJsAsync(List<IfcEntity>
         {
             Dispatcher.Invoke(() =>
             {
+                var mainGrid = _mainGrid ?? throw new InvalidOperationException("Main grid not initialized.");
+
                 // Insert notification bar at the top (row 0)
                 var notificationBar = new UpdateNotificationBar(updateInfo);
 
                 // Shift existing rows down
-                _mainGrid!.RowDefinitions.Insert(0, new RowDefinition { Height = GridLength.Auto });
+                mainGrid.RowDefinitions.Insert(0, new RowDefinition { Height = GridLength.Auto });
 
                 // Move existing content down one row
-                foreach (var child in _mainGrid.Children.Cast<UIElement>().ToList())
+                foreach (var child in mainGrid.Children.Cast<UIElement>().ToList())
                 {
                     var currentRow = WpfGrid.GetRow(child);
                     WpfGrid.SetRow(child, currentRow + 1);
@@ -486,7 +488,7 @@ private async System.Threading.Tasks.Task PushSelectionToJsAsync(List<IfcEntity>
 
                 // Add notification at row 0
                 WpfGrid.SetRow(notificationBar, 0);
-                _mainGrid.Children.Insert(0, notificationBar);
+                mainGrid.Children.Insert(0, notificationBar);
             });
         }
         catch (Exception ex)

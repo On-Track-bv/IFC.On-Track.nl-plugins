@@ -2,8 +2,8 @@
 <!-- Purpose: Revit addin manifest file -->
 <RevitAddIns>
   <AddIn Type="Application">
-    <Name>IFC.On-Track.nl</Name>
-    <Assembly>IfcOnTrack.Revit/IfcOnTrack.Revit.dll</Assembly>
+    <Name>IFC On-Track bSDD plugin</Name>
+    <Assembly>IfcOnTrack.Revit\IfcOnTrack.Revit.dll</Assembly>
     <FullClassName>IfcOnTrack.Revit.Application</FullClassName>
     <AddInId>F8A9B7C6-D5E4-3F21-A0B9-C8D7E6F5A4B3</AddInId>
     <VendorId>On-Track</VendorId>
