@@ -14,7 +14,7 @@ scriptroot="$( cd -P "$( dirname "$bash_source" )" && pwd )"
 ###########################################################################
 
 BUILD_PROJECT_FILE="$scriptroot/build/Build.csproj"
-TEMP_DIRECTORY="$scriptroot/.nuke/temp"
+TEMP_DIRECTORY="$scriptroot/.build/temp"
 
 DOTNET_GLOBAL_FILE="$scriptroot/global.json"
 DOTNET_INSTALL_URL="https://dot.net/v1/dotnet-install.sh"

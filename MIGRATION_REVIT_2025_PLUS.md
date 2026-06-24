@@ -68,7 +68,7 @@ git push origin v1.0-r24-final
 ## Next Steps
 
 1. **Complete cleanup**: Remove remaining NET48 conditionals in other files
-2. **Update NUKE build**: Remove R24 targets from build system
+2. **Update build**: Remove R24 targets from build system
 3. **Test thoroughly**: Build and test in Revit 2025 and 2026
 4. **Update deployment**: Ensure .addin manifest doesn't reference R24
 5. **Document breaking change**: Add to CHANGELOG.md or release notes

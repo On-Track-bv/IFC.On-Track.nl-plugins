@@ -78,10 +78,12 @@
         <Resource Include="Resources\Icons\RibbonIcon32.png" />
         <Resource Include="Resources\Icons\BsddIcon16.png" />
         <Resource Include="Resources\Icons\BsddIcon32.png" />
+        <Resource Include="Resources\Icons\BsddIcon96.png" />
         <Resource Include="Resources\Icons\IdsIcon16.png" />
         <Resource Include="Resources\Icons\IdsIcon32.png" />
         <Resource Include="Resources\Icons\IfcExportIcon16.png" />
         <Resource Include="Resources\Icons\IfcExportIcon32.png" />
+        <Resource Include="Resources\Icons\IfcExportIcon96.png" />
         <Resource Include="Resources\Icons\SettingsIcon16.png" />
         <Resource Include="Resources\Icons\SettingsIcon32.png" />
     </ItemGroup>

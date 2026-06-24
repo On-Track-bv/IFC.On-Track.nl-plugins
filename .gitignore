@@ -106,8 +106,8 @@ coverage*.json
 coverage*.xml
 coverage*.info
 
-# NUKE build system
-.nuke/temp/
+# ModularPipelines build system
+.build/temp/
 
 # Windows
 Thumbs.db
