@@ -13,10 +13,12 @@ De plugin heeft drie distributie kanalen:
 
 ### 1. GitHub Release maken
 
-```bash
+```powershell
 # Via ModularPipelines build script
 .\build.ps1 release
+```
 
+```bash
 # Of via Git tag
 git tag v1.0.0
 git push --tags
