@@ -139,19 +139,18 @@ public class Application : ExternalApplication
 
     private void CreateRibbon()
     {
-        var panel = Application.CreatePanel("bSDD", "IFC.On-Track.nl");
+        var panel = Application.CreatePanel("bSDD", "bSDD");
 
-        // Toggle dockable pane (matches original "bSDD selection" button)
+        // bSDD selection first — primary workflow
         panel.AddPushButton<ShowBsddPanelCommand>("bSDD\nselection")
             .SetImage("/IfcOnTrack.Revit;component/Resources/Icons/BsddIcon16.png")
             .SetLargeImage("/IfcOnTrack.Revit;component/Resources/Icons/BsddIcon32.png")
-            .SetToolTip("Show/hide bSDD Classification panel");
+            .SetToolTip("Show/hide bSDD selection panel");
 
-        // IFC Export with bSDD (matches original "IFC export" button)
         panel.AddPushButton<IfcExportCommand>("IFC\nexport")
             .SetImage("/IfcOnTrack.Revit;component/Resources/Icons/IfcExportIcon16.png")
             .SetLargeImage("/IfcOnTrack.Revit;component/Resources/Icons/IfcExportIcon32.png")
-            .SetToolTip("Export to IFC with correct bSDD classification references");
+            .SetToolTip("Export to IFC using bSDD settings");
     }
 
     // ─── Dockable pane ─────────────────────────────────────────────────────────

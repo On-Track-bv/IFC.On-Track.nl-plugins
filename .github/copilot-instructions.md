@@ -15,12 +15,11 @@ cd IFC.On-Track.nl-plugins
 dotnet restore -p:Configuration="Debug.R25"
 dotnet build -c "Debug.R25"
 
-# Or use NUKE
-dotnet tool install Nuke.GlobalTool --global
-nuke
+# Or use ModularPipelines build script
+.\build.ps1
 ```
 
-**Tech Stack:** C# 12, .NET 8, Nice3point.Revit.Toolkit, NUKE Build, WebView2
+**Tech Stack:** C# 12, .NET 8, Nice3point.Revit.Toolkit, ModularPipelines, WebView2
 
 ## Architecture Overview
 
@@ -37,7 +36,7 @@ IFC.On-Track.nl-plugins/
 │       └── packages/
 │           ├── core/          # Bridge types (generated from schema)
 │           └── trimble-connect/ # Trimble Connect addon (planned)
-├── build/                     # NUKE build scripts
+├── build/                     # ModularPipelines build scripts
 └── output/                    # Build artifacts (gitignored)
 ```
 

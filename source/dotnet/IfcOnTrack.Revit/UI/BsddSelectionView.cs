@@ -475,7 +475,7 @@ private async System.Threading.Tasks.Task PushSelectionToJsAsync(List<IfcEntity>
                 var notificationBar = new UpdateNotificationBar(updateInfo);
 
                 // Shift existing rows down
-                _mainGrid.RowDefinitions.Insert(0, new RowDefinition { Height = GridLength.Auto });
+                _mainGrid!.RowDefinitions.Insert(0, new RowDefinition { Height = GridLength.Auto });
 
                 // Move existing content down one row
                 foreach (var child in _mainGrid.Children.Cast<UIElement>().ToList())

@@ -14,9 +14,8 @@ De plugin heeft drie distributie kanalen:
 ### 1. GitHub Release maken
 
 ```bash
-# Via NUKE build systeem
-cd build
-dotnet nuke
+# Via ModularPipelines build script
+.\build.ps1 release
 
 # Of via Git tag
 git tag v1.0.0

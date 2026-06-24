@@ -138,7 +138,7 @@ public class BsddSearchBridge
                 var originalTags = originalSelection
                     .Where(e => !string.IsNullOrEmpty(e.Tag))
                     .Select((e, index) => new { e.Tag, Index = index })
-                    .ToDictionary(x => x.Tag, x => x.Index);
+                    .ToDictionary(x => x.Tag!, x => x.Index);
 
                 // Fetch fresh data ONLY for the originally selected entities
                 var allEntities = _elementsManager.GetAllElementTypesAsIfcJson(doc);
