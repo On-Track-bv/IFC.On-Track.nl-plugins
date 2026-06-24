@@ -7,7 +7,10 @@
     </Configurations>
     <Folder Name="/install/">
         <Project Path="install/Installer.csproj">
-            <BuildType Project="Debug" />
+            <BuildType Solution="Debug.R25|*" Project="Debug" />
+            <BuildType Solution="Debug.R26|*" Project="Debug" />
+            <BuildType Solution="Release.R25|*" Project="Release" />
+            <BuildType Solution="Release.R26|*" Project="Release" />
         </Project>
     </Folder>
     <Folder Name="/Solution Items/">
